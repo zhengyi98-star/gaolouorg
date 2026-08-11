@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>高楼之巅 | gaolou.org</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400&family=Cormorant+Garamond:ital,wght@0,300;1,300&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --ease-slow: cubic-bezier(0.22, 1, 0.36, 1);
+    --ui-fade-in: 1.1s;
+    --ui-fade-out: 1.8s;
+  }
+
+  *{ margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color: transparent; }
+
+  html, body{
+    width:100%; height:100%;
+    overflow:hidden;
+    background:#0a0a0a;
+    font-family: 'Noto Sans SC', -apple-system, 'PingFang SC', 'Helvetica Neue', sans-serif;
+    cursor: default;
+  }
+
+  /* ============ 背景视频层 ============ */
+
+  #bg-stage{
+    position:fixed;
+    top:0; left:0;
+    width:100vw; height:100vh;
+    overflow:hidden;
+    background:#000;
+    z-index:0;
+  }
+
+  #bg-frame{
+    position:absolute;
+    top:50%; left:50%;
+    transform:translate(-50%,-50%);
+    border:0;
+    /* 尺寸由 JS 按 16:9 满铺算法实时计算，杜绝黑边/白边/拉伸 */
+    pointer-events:none;      /* 关键防干扰：彻底禁止对背景视频的任何点击/长按/右键交互 */
+    user-select:none;
+    transition: opacity 1.4s ease;
+  }
+
+  /* 夜间遮罩滤镜层：压暗视频，保证悬浮文字清晰可读 */
+  #bg-veil{
+    position:fixed;
+    inset:0;
+    z-index:1;
+    pointer-events:none;
+    background: rgba(0,0,0,0.28);
+    backdrop-filter: brightness(0.62) saturate(1.05);
+    -webkit-backdrop-filter: brightness(0.62) saturate(1.05);
+  }
+
+  /* 极轻的四角暗角，增加纵深与高级感 */
+  #bg-vignette{
+    position:fixed;
+    inset:0;
+    z-index:2;
+    pointer-events:none;
+    background: radial-gradient(ellipse at center, rgba(0,0,0,0) 45%, rgba(0,0,0,0.35) 100%);
+  }
+
+  /* ============ 界面总容器：负责统一呼吸式显隐 ============ */
+
+  .ui-layer{
+    position:fixed;
+    inset:0;
+    z-index:10;
+    pointer-events:none;
+  }
+
+  .ui-fade{
+    opacity:0;
+    transition: opacity var(--ui-fade-out) var(--ease-slow);
+    pointer-events:none;
+  }
+  body.ui-visible .ui-fade{
+    opacity:1;
+    transition: opacity var(--ui-fade-in) var(--ease-slow);
+    pointer-events:auto;
+  }
+
+  /* 冥想模式：强制在 1 秒内彻底隐藏主界面，且无论鼠标如何移动都不再唤醒 */
+  body.meditating .ui-fade{
+    opacity:0 !important;
+    pointer-events:none !important;
+    transition: opacity 1s var(--ease-slow) !important;
+  }
+  body.meditating{
+    cursor:none;
+  }
+
+  /* ============ 左上角：品牌文案组 ============ */
+
+  .brand{
+    position:fixed;
+    top:5.5vh;
+    left:5.5vw;
+    z-index:11;
+    text-align:left;
+    user-select:none;
+  }
+
+  .brand__title{
+    font-family: 'Noto Sans SC', sans-serif;
+    font-weight:300;
+    font-size:1.2rem;
+    letter-spacing:0.18em;
+    color:rgba(255,255,255,0.92);
+    text-shadow: 0 1px 12px rgba(0,0,0,0.35);
+  }
+
+  .brand__title .en{
+    font-family: 'Cormorant Garamond', 'Noto Sans SC', serif;
+    font-style: italic;
+    font-weight:300;
+    letter-spacing:0.06em;
+    opacity:0.75;
+    margin-left:0.5em;
+    font-size:0.92em;
+  }
+
+  .brand__divider{
+    display:block;
+    width:22px;
+    height:1px;
+    background:rgba(255,255,255,0.4);
+    margin:0.85em 0;
+  }
+
+  .brand__subtitle{
+    font-weight:300;
+    font-size:0.9rem;
+    letter-spacing:0.12em;
+    color:rgba(255,255,255,0.6);
+  }
+
+  /* ============ 下方正中：毛玻璃控制面板 ============ */
+
+  .control-panel{
+    position:fixed;
+    left:50%;
+    bottom:6vh;
+    transform:translateX(-50%);
+    z-index:11;
+    display:flex;
+    align-items:center;
+    gap:6px;
+    padding:10px 14px;
+    border-radius:999px;
+    background:rgba(255,255,255,0.06);
+    border:1px solid rgba(255,255,255,0.14);
+    backdrop-filter: blur(16px) saturate(140%);
+    -webkit-backdrop-filter: blur(16px) saturate(140%);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+  }
+
+  .scene-btn{
+    appearance:none;
+    -webkit-appearance:none;
+    border:0;
+    background:transparent;
+    width:42px;
+    height:42px;
+    border-radius:50%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    position:relative;
+    transition: background 0.5s ease, transform 0.4s ease;
+  }
+
+  .scene-btn:hover{
+    background:rgba(255,255,255,0.09);
+  }
+
+  .scene-btn svg{
+    width:18px;
+    height:18px;
+    stroke:rgba(255,255,255,0.62);
+    stroke-width:1;
+    fill:none;
+    stroke-linecap:round;
+    stroke-linejoin:round;
+    transition: stroke 0.5s ease, opacity 0.5s ease;
+  }
+
+  .scene-btn.active{
+    background:rgba(255,255,255,0.13);
+  }
+  .scene-btn.active svg{
+    stroke:rgba(255,255,255,0.98);
+  }
+
+  .scene-btn__label{
+    position:absolute;
+    bottom:calc(100% + 10px);
+    left:50%;
+    transform:translateX(-50%) translateY(4px);
+    white-space:nowrap;
+    font-size:0.68rem;
+    letter-spacing:0.15em;
+    font-weight:300;
+    color:rgba(255,255,255,0.85);
+    background:rgba(0,0,0,0.4);
+    padding:4px 10px;
+    border-radius:6px;
+    opacity:0;
+    pointer-events:none;
+    transition: opacity 0.35s ease, transform 0.35s ease;
+    backdrop-filter: blur(6px);
+  }
+
+  .scene-btn:hover .scene-btn__label{
+    opacity:1;
+    transform:translateX(-50%) translateY(0);
+  }
+
+  .panel-divider{
+    width:1px;
+    height:18px;
+    background:rgba(255,255,255,0.16);
+    margin:0 2px;
+  }
+
+  /* ============ 冥想时长气泡菜单 ============ */
+
+  .time-picker{
+    position:fixed;
+    left:50%;
+    bottom:calc(6vh + 74px);
+    transform:translateX(-50%) translateY(8px);
+    z-index:13;
+    min-width:230px;
+    padding:16px 18px;
+    border-radius:22px;
+    background:rgba(255,255,255,0.07);
+    border:1px solid rgba(255,255,255,0.15);
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    box-shadow: 0 10px 34px rgba(0,0,0,0.32);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:14px;
+    opacity:0;
+    pointer-events:none;
+    transition: opacity 0.45s var(--ease-slow), transform 0.45s var(--ease-slow);
+  }
+  .time-picker.open{
+    opacity:1;
+    pointer-events:auto;
+    transform:translateX(-50%) translateY(0);
+  }
+  body.meditating .time-picker{
+    opacity:0 !important;
+    pointer-events:none !important;
+  }
+
+  .time-picker__label{
+    font-size:0.68rem;
+    letter-spacing:0.2em;
+    font-weight:300;
+    color:rgba(255,255,255,0.5);
+  }
+
+  .time-picker__options{
+    display:flex;
+    gap:8px;
+  }
+
+  .time-picker__option{
+    appearance:none;
+    -webkit-appearance:none;
+    border:1px solid rgba(255,255,255,0.22);
+    background:rgba(255,255,255,0.04);
+    color:rgba(255,255,255,0.75);
+    font-family:inherit;
+    font-weight:300;
+    font-size:0.75rem;
+    letter-spacing:0.08em;
+    padding:8px 14px;
+    border-radius:999px;
+    cursor:pointer;
+    transition: background 0.4s ease, border-color 0.4s ease, color 0.4s ease;
+  }
+
+  .time-picker__option:hover{
+    border-color:rgba(255,255,255,0.45);
+  }
+
+  .time-picker__option.selected{
+    background:rgba(255,255,255,0.85);
+    color:rgba(10,10,10,0.85);
+    border-color:rgba(255,255,255,0.85);
+  }
+
+  .time-picker__start{
+    appearance:none;
+    -webkit-appearance:none;
+    border:1px solid rgba(255,255,255,0.3);
+    background:transparent;
+    color:rgba(255,255,255,0.35);
+    font-family:inherit;
+    font-weight:300;
+    font-size:0.78rem;
+    letter-spacing:0.25em;
+    padding:8px 26px;
+    border-radius:999px;
+    cursor:not-allowed;
+    transition: all 0.4s ease;
+  }
+
+  .time-picker__start.enabled{
+    color:rgba(255,255,255,0.95);
+    border-color:rgba(255,255,255,0.7);
+    cursor:pointer;
+  }
+  .time-picker__start.enabled:hover{
+    background:rgba(255,255,255,0.12);
+  }
+
+  /* ============ 中央呼吸冥想气泡（Pixel Thoughts 致敬）============ */
+
+  .meditation-layer{
+    position:fixed;
+    inset:0;
+    z-index:20;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:32px;
+    opacity:0;
+    pointer-events:none;
+    transition: opacity 1.4s var(--ease-slow);
+  }
+  .meditation-layer.active{
+    opacity:1;
+    pointer-events:auto;
+  }
+
+  .breath-bubble{
+    width:80px;
+    height:80px;
+    border-radius:50%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background: radial-gradient(circle at 35% 32%, rgba(255,255,255,0.4), rgba(255,255,255,0.05) 72%);
+    border:1px solid rgba(255,255,255,0.4);
+    animation: breathe 8s ease-in-out infinite;
+    will-change: transform, box-shadow;
+  }
+
+  @keyframes breathe{
+    0%   { transform:scale(1);    box-shadow:0 0 20px 4px rgba(255,255,255,0.14), 0 0 46px 14px rgba(255,255,255,0.05); }
+    50%  { transform:scale(1.85); box-shadow:0 0 60px 20px rgba(255,255,255,0.32), 0 0 120px 36px rgba(255,255,255,0.12); }
+    100% { transform:scale(1);    box-shadow:0 0 20px 4px rgba(255,255,255,0.14), 0 0 46px 14px rgba(255,255,255,0.05); }
+  }
+
+  .breath-bubble__text{
+    font-weight:300;
+    font-size:0.78rem;
+    letter-spacing:0.15em;
+    color:rgba(255,255,255,0.88);
+    transition: opacity 0.6s ease;
+    white-space:nowrap;
+  }
+
+  .breath-countdown{
+    font-weight:300;
+    font-size:0.72rem;
+    letter-spacing:0.22em;
+    color:rgba(255,255,255,0.38);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .breath-hint{
+    position:fixed;
+    bottom:4.5vh;
+    left:50%;
+    transform:translateX(-50%);
+    font-size:0.62rem;
+    letter-spacing:0.12em;
+    color:rgba(255,255,255,0.26);
+    font-weight:300;
+    white-space:nowrap;
+  }
+
+  /* ============ 移动端适配 ============ */
+
+  @media (max-width: 640px){
+    .brand{ top:6.5vh; left:6vw; }
+    .brand__title{ font-size:1.05rem; }
+    .brand__subtitle{ font-size:0.78rem; }
+    .control-panel{ bottom:5vh; padding:8px 10px; gap:2px; }
+    .scene-btn{ width:38px; height:38px; }
+    .scene-btn__label{ display:none; } /* 触屏无 hover，隐藏文字气泡 */
+    .time-picker{ bottom:calc(5vh + 66px); min-width:210px; }
+  }
+
+  /* 无障碍：尊重系统的“减少动态效果”偏好 */
+  @media (prefers-reduced-motion: reduce){
+    .ui-fade, #bg-frame{ transition-duration: 0.2s !important; }
+    .breath-bubble{ animation-duration: 12s; }
+  }
+</style>
+</head>
+<body>
+
+  <!-- ============ 背景视频舞台 ============ -->
+  <div id="bg-stage">
+    <iframe
+      id="bg-frame"
+      src=""
+      title="background-scene"
+      frameborder="0"
+      scrolling="no"
+      allow="autoplay; encrypted-media"
+      tabindex="-1"
+      aria-hidden="true">
+    </iframe>
+  </div>
+
+  <div id="bg-veil"></div>
+  <div id="bg-vignette"></div>
+
+  <!-- ============ 界面层 ============ -->
+  <div class="ui-layer">
+
+    <!-- 左上角品牌文案 -->
+    <div class="brand ui-fade">
+      <div class="brand__title">高楼之巅 <span class="en">gaolou.org</span></div>
+      <span class="brand__divider"></span>
+      <div class="brand__subtitle">登高，望远，然后释怀。</div>
+    </div>
+
+    <!-- 下方毛玻璃控制面板 -->
+    <div class="control-panel ui-fade" role="group" aria-label="切换风景与冥想">
+
+      <button class="scene-btn" data-scene="chongqing" aria-label="魔幻重庆">
+        <span class="scene-btn__label">魔幻重庆</span>
+        <svg viewBox="0 0 24 24"><path d="M2 20h20M4 20V11l3-2.2 3 2.2v9M10 20V6.5l3-3 3 3V20M16 20v-8l3-2 2 2v8"/></svg>
+      </button>
+
+      <div class="panel-divider"></div>
+
+      <button class="scene-btn" data-scene="shanghai" aria-label="都市上海">
+        <span class="scene-btn__label">都市上海</span>
+        <svg viewBox="0 0 24 24"><path d="M12 2.5v19M8.2 8h7.6M9 14.3h6M5.5 20.5h13"/><circle cx="12" cy="6" r="2"/><circle cx="12" cy="11" r="1.3"/></svg>
+      </button>
+
+      <div class="panel-divider"></div>
+
+      <button class="scene-btn" data-scene="snowmountain" aria-label="治愈雪山">
+        <span class="scene-btn__label">治愈雪山</span>
+        <svg viewBox="0 0 24 24"><path d="M3 19.5L9.5 7l3 4.2 2-2.8 6.5 11.1H3Z"/><path d="M7.6 12.6l1.6 2.1M13.6 9.3l1.1 1.5"/></svg>
+      </button>
+
+      <div class="panel-divider"></div>
+
+      <button class="scene-btn" data-scene="cyberpunk" aria-label="虚拟夜之城">
+        <span class="scene-btn__label">虚拟夜之城</span>
+        <svg viewBox="0 0 24 24"><path d="M2 20.5h20M4.5 20.5l3.5-9.5M19.5 20.5L16 11M8.7 20.5l1.7-5.2M15.3 20.5l-1.7-5.2M11 20.5V10M13 20.5V10"/></svg>
+      </button>
+
+      <div class="panel-divider"></div>
+
+      <button class="scene-btn" id="meditateBtn" aria-label="冥想发呆">
+        <span class="scene-btn__label">冥想发呆</span>
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.6"/><circle cx="12" cy="12" r="6.4" stroke-opacity="0.55"/><circle cx="12" cy="12" r="10" stroke-opacity="0.28"/></svg>
+      </button>
+
+    </div>
+
+  </div>
+
+  <!-- ============ 冥想时长选择气泡菜单 ============ -->
+  <div class="time-picker" id="timePicker">
+    <div class="time-picker__label">留白多久</div>
+    <div class="time-picker__options">
+      <button class="time-picker__option" data-min="1">1 分钟</button>
+      <button class="time-picker__option" data-min="3">3 分钟</button>
+      <button class="time-picker__option" data-min="5">5 分钟</button>
+    </div>
+    <button class="time-picker__start" id="startMeditation">开始</button>
+  </div>
+
+  <!-- ============ 中央呼吸冥想层 ============ -->
+  <div class="meditation-layer" id="meditationLayer" aria-hidden="true">
+    <div class="breath-bubble" id="breathBubble">
+      <span class="breath-bubble__text" id="breathText">吸气...</span>
+    </div>
+    <div class="breath-countdown" id="breathCountdown">00:00</div>
+    <div class="breath-hint">按 Esc 或双击屏幕，随时回到高楼之巅</div>
+  </div>
+
+<script>
+(function(){
+
+  // ============================================================
+  // 1. 场景配置 —— 占位视频源，请替换为你自己的真实视频 ID / 直链
+  //    支持 YouTube embed 或任意可 autoplay+mute+loop 的视频 iframe 源
+  // ============================================================
+  var SCENES = {
+    chongqing:    { name:'魔幻重庆', src:'https://www.youtube.com/embed/REPLACE_CHONGQING_ID?autoplay=1&mute=1&loop=1&playlist=REPLACE_CHONGQING_ID&controls=0&showinfo=0&modestbranding=1&rel=0&iv_load_policy=3&disablekb=1&playsinline=1' },
+    shanghai:     { name:'都市上海', src:'https://www.youtube.com/embed/REPLACE_SHANGHAI_ID?autoplay=1&mute=1&loop=1&playlist=REPLACE_SHANGHAI_ID&controls=0&showinfo=0&modestbranding=1&rel=0&iv_load_policy=3&disablekb=1&playsinline=1' },
+    snowmountain: { name:'治愈雪山', src:'https://www.youtube.com/embed/REPLACE_SNOWMOUNTAIN_ID?autoplay=1&mute=1&loop=1&playlist=REPLACE_SNOWMOUNTAIN_ID&controls=0&showinfo=0&modestbranding=1&rel=0&iv_load_policy=3&disablekb=1&playsinline=1' },
+    cyberpunk:    { name:'虚拟夜之城', src:'https://www.youtube.com/embed/REPLACE_CYBERPUNK_ID?autoplay=1&mute=1&loop=1&playlist=REPLACE_CYBERPUNK_ID&controls=0&showinfo=0&modestbranding=1&rel=0&iv_load_policy=3&disablekb=1&playsinline=1' }
+  };
+  var DEFAULT_SCENE = 'chongqing';
+  var VIDEO_RATIO = 16 / 9; // 若替换为竖屏或其他比例素材，请同步修改此值
+
+  var bgFrame = document.getElementById('bg-frame');
+  var sceneButtons = document.querySelectorAll('.scene-btn[data-scene]');
+
+  // ============================================================
+  // 2. 背景 iframe「等比满铺裁切」算法
+  //    保证任何分辨率下都 100% 覆盖屏幕，绝无黑边 / 白边 / 拉伸
+  // ============================================================
+  function fitBackground(){
+    var winW = window.innerWidth;
+    var winH = window.innerHeight;
+    var winRatio = winW / winH;
+    var w, h;
+
+    if (winRatio > VIDEO_RATIO) {
+      w = winW;
+      h = w / VIDEO_RATIO;
+    } else {
+      h = winH;
+      w = h * VIDEO_RATIO;
+    }
+
+    w *= 1.02;
+    h *= 1.02;
+
+    bgFrame.style.width  = w + 'px';
+    bgFrame.style.height = h + 'px';
+  }
+
+  window.addEventListener('resize', fitBackground);
+  window.addEventListener('orientationchange', function(){
+    setTimeout(fitBackground, 200);
+  });
+  fitBackground();
+
+  // ============================================================
+  // 3. 场景切换
+  // ============================================================
+  function switchScene(key){
+    var scene = SCENES[key];
+    if (!scene) return;
+
+    bgFrame.style.opacity = '0';
+    setTimeout(function(){
+      bgFrame.src = scene.src;
+      fitBackground();
+      bgFrame.style.opacity = '1';
+    }, 350);
+
+    sceneButtons.forEach(function(btn){
+      btn.classList.toggle('active', btn.dataset.scene === key);
+    });
+  }
+
+  sceneButtons.forEach(function(btn){
+    btn.addEventListener('click', function(){
+      switchScene(btn.dataset.scene);
+    });
+  });
+
+  switchScene(DEFAULT_SCENE);
+
+  // ============================================================
+  // 4. 智能隐形逻辑（鼠标静止 3 秒自动隐藏）
+  // ============================================================
+  var hideTimer = null;
+  var HIDE_DELAY = 3000;
+
+  function wake(){
+    // 冥想模式下彻底冻结此逻辑：无论怎样移动鼠标，界面都绝不重新出现
+    if (document.body.classList.contains('meditating')) return;
+
+    document.body.classList.add('ui-visible');
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(function(){
+      document.body.classList.remove('ui-visible');
+    }, HIDE_DELAY);
+  }
+
+  ['mousemove', 'mousedown', 'touchstart', 'touchmove', 'keydown', 'wheel'].forEach(function(evt){
+    window.addEventListener(evt, wake, { passive:true });
+  });
+
+  wake();
+
+  window.addEventListener('contextmenu', function(e){ e.preventDefault(); });
+
+  // ============================================================
+  // 5. 冥想发呆 —— 时长选择气泡菜单
+  // ============================================================
+  var meditateBtn   = document.getElementById('meditateBtn');
+  var timePicker    = document.getElementById('timePicker');
+  var durationBtns  = document.querySelectorAll('.time-picker__option');
+  var startBtn      = document.getElementById('startMeditation');
+
+  var selectedMinutes = null;
+
+  meditateBtn.addEventListener('click', function(e){
+    e.stopPropagation();
+    var willOpen = !timePicker.classList.contains('open');
+    timePicker.classList.toggle('open', willOpen);
+    meditateBtn.classList.toggle('active', willOpen);
+  });
+
+  durationBtns.forEach(function(btn){
+    btn.addEventListener('click', function(e){
+      e.stopPropagation();
+      durationBtns.forEach(function(b){ b.classList.remove('selected'); });
+      btn.classList.add('selected');
+      selectedMinutes = parseInt(btn.dataset.min, 10);
+      startBtn.classList.add('enabled');
+    });
+  });
+
+  startBtn.addEventListener('click', function(e){
+    e.stopPropagation();
+    if (!selectedMinutes) return;
+    timePicker.classList.remove('open');
+    meditateBtn.classList.remove('active');
+    startMeditation(selectedMinutes);
+  });
+
+  // 点击气泡菜单以外的区域，优雅收起
+  document.addEventListener('click', function(e){
+    if (timePicker.classList.contains('open') &&
+        !timePicker.contains(e.target) &&
+        e.target !== meditateBtn &&
+        !meditateBtn.contains(e.target)){
+      timePicker.classList.remove('open');
+      meditateBtn.classList.remove('active');
+    }
+  });
+
+  // ============================================================
+  // 6. 进入冥想（开启精神留白）—— 呼吸引导气泡
+  // ============================================================
+  var meditationLayer = document.getElementById('meditationLayer');
+  var breathText       = document.getElementById('breathText');
+  var breathCountdown  = document.getElementById('breathCountdown');
+
+  var countdownTimer  = null;
+  var breathTextTimer = null;
+  var remainingSeconds = 0;
+
+  function startMeditation(minutes){
+    remainingSeconds = minutes * 60;
+    updateCountdownDisplay();
+
+    // 6.1 主界面在 1 秒内彻底冻结、淡出（由 body.meditating 的 CSS 强制接管）
+    document.body.classList.add('meditating');
+    document.body.classList.remove('ui-visible');
+    clearTimeout(hideTimer);
+
+    // 6.2 短暂停顿后，呼吸气泡缓缓浮现，强化仪式感
+    setTimeout(function(){
+      meditationLayer.classList.add('active');
+      startBreathCycle();
+    }, 650);
+
+    countdownTimer = setInterval(function(){
+      remainingSeconds--;
+      updateCountdownDisplay();
+      if (remainingSeconds <= 0){
+        endMeditation();
+      }
+    }, 1000);
+  }
+
+  function startBreathCycle(){
+    var inhale = true;
+    breathText.textContent = '吸气...';
+    breathText.style.opacity = '1';
+
+    breathTextTimer = setInterval(function(){
+      inhale = !inhale;
+      breathText.style.opacity = '0';
+      setTimeout(function(){
+        if (inhale){
+          breathText.textContent = '吸气...';
+        } else {
+          breathText.textContent = Math.random() > 0.5 ? '呼气...' : '释怀...';
+        }
+        breathText.style.opacity = '1';
+      }, 300);
+    }, 4000);
+  }
+
+  function updateCountdownDisplay(){
+    var m = Math.floor(remainingSeconds / 60);
+    var s = remainingSeconds % 60;
+    breathCountdown.textContent = (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+  }
+
+  // ============================================================
+  // 7. 优雅退出：倒计时结束 / Esc / 手机双击
+  // ============================================================
+  function endMeditation(){
+    clearInterval(countdownTimer);
+    clearInterval(breathTextTimer);
+    countdownTimer = null;
+    breathTextTimer = null;
+
+    meditationLayer.classList.remove('active');
+
+    setTimeout(function(){
+      document.body.classList.remove('meditating');
+      selectedMinutes = null;
+      durationBtns.forEach(function(b){ b.classList.remove('selected'); });
+      startBtn.classList.remove('enabled');
+      wake(); // 解冻并重新激活鼠标静止淡出监听，无缝回到第一步的隐形状态
+    }, 1200);
+  }
+
+  window.addEventListener('keydown', function(e){
+    if (e.key === 'Escape' && document.body.classList.contains('meditating')){
+      endMeditation();
+    }
+  });
+
+  var lastTap = 0;
+  meditationLayer.addEventListener('touchend', function(){
+    var now = Date.now();
+    if (now - lastTap < 350 && document.body.classList.contains('meditating')){
+      endMeditation();
+    }
+    lastTap = now;
+  });
+
+})();
+</script>
+
+</body>
+</html>
