@@ -26,26 +26,30 @@
     cursor: default;
   }
 
-  /* ============ 背景视频层 ============ */
+  /* ============ 原生 <video> 背景层 ============ */
+  /* 纯 CSS 满铺裁切方案：min-width/min-height 保证视频永远盖满视口，
+     object-fit: cover 负责按比例裁切多余部分，双重保险杜绝黑边、白边与拉伸 */
 
-  #bg-stage{
+  .bg-video{
     position:fixed;
-    top:0; left:0;
-    width:100vw; height:100vh;
-    overflow:hidden;
+    right:0;
+    bottom:0;
+    min-width:100%;
+    min-height:100%;
+    width:auto;
+    height:auto;
+    object-fit:cover;
+    z-index:-1;
+    pointer-events:none;      /* 关键防干扰：彻底禁止对背景视频的任何点击/长按交互 */
+    user-select:none;
+    opacity:0;
+    transition: opacity 1.2s ease;
     background:#000;
-    z-index:0;
   }
 
-  #bg-frame{
-    position:absolute;
-    top:50%; left:50%;
-    transform:translate(-50%,-50%);
-    border:0;
-    /* 尺寸由 JS 按 16:9 满铺算法实时计算，杜绝黑边/白边/拉伸 */
-    pointer-events:none;      /* 关键防干扰：彻底禁止对背景视频的任何点击/长按/右键交互 */
-    user-select:none;
-    transition: opacity 1.4s ease;
+  /* 双 video 叠层，用于无闪烁的平滑交叉淡入淡出切换 */
+  .bg-video.active{
+    opacity:1;
   }
 
   /* 夜间遮罩滤镜层：压暗视频，保证悬浮文字清晰可读 */
@@ -411,26 +415,17 @@
 
   /* 无障碍：尊重系统的“减少动态效果”偏好 */
   @media (prefers-reduced-motion: reduce){
-    .ui-fade, #bg-frame{ transition-duration: 0.2s !important; }
+    .ui-fade{ transition-duration: 0.2s !important; }
+    .bg-video{ transition-duration: 0.2s !important; }
     .breath-bubble{ animation-duration: 12s; }
   }
 </style>
 </head>
 <body>
 
-  <!-- ============ 背景视频舞台 ============ -->
-  <div id="bg-stage">
-    <iframe
-      id="bg-frame"
-      src=""
-      title="background-scene"
-      frameborder="0"
-      scrolling="no"
-      allow="autoplay; encrypted-media"
-      tabindex="-1"
-      aria-hidden="true">
-    </iframe>
-  </div>
+  <!-- ============ 原生 HTML5 视频背景（已彻底移除 iframe，无第三方广告/跳转）============ -->
+  <video id="bg-video-1" class="bg-video" autoplay loop muted playsinline preload="auto"></video>
+  <video id="bg-video-2" class="bg-video" autoplay loop muted playsinline preload="auto"></video>
 
   <div id="bg-veil"></div>
   <div id="bg-vignette"></div>
@@ -509,65 +504,54 @@
 (function(){
 
   // ============================================================
-  // 1. 场景配置 —— 占位视频源，请替换为你自己的真实视频 ID / 直链
-  //    支持 YouTube embed 或任意可 autoplay+mute+loop 的视频 iframe 源
+  // 1. 场景配置 —— 纯净无广告的 MP4 直链占位素材（Mixkit 免版权片库）
+  //    id 字段即为可直接播放的视频直链，替换为你自己的素材时
+  //    只需保证是 https 直链、体积不大、可循环播放即可
   // ============================================================
   var SCENES = {
-    chongqing:    { name:'魔幻重庆', src:'https://www.youtube.com/embed/REPLACE_CHONGQING_ID?autoplay=1&mute=1&loop=1&playlist=REPLACE_CHONGQING_ID&controls=0&showinfo=0&modestbranding=1&rel=0&iv_load_policy=3&disablekb=1&playsinline=1' },
-    shanghai:     { name:'都市上海', src:'https://www.youtube.com/embed/REPLACE_SHANGHAI_ID?autoplay=1&mute=1&loop=1&playlist=REPLACE_SHANGHAI_ID&controls=0&showinfo=0&modestbranding=1&rel=0&iv_load_policy=3&disablekb=1&playsinline=1' },
-    snowmountain: { name:'治愈雪山', src:'https://www.youtube.com/embed/REPLACE_SNOWMOUNTAIN_ID?autoplay=1&mute=1&loop=1&playlist=REPLACE_SNOWMOUNTAIN_ID&controls=0&showinfo=0&modestbranding=1&rel=0&iv_load_policy=3&disablekb=1&playsinline=1' },
-    cyberpunk:    { name:'虚拟夜之城', src:'https://www.youtube.com/embed/REPLACE_CYBERPUNK_ID?autoplay=1&mute=1&loop=1&playlist=REPLACE_CYBERPUNK_ID&controls=0&showinfo=0&modestbranding=1&rel=0&iv_load_policy=3&disablekb=1&playsinline=1' }
+    // 占位：通用城市夜景（建议替换为真实的重庆夜景/魔幻8D城市素材）
+    chongqing:    { name:'魔幻重庆', id:'https://assets.mixkit.co/videos/47669/47669-720.mp4' },
+    shanghai:     { name:'都市上海', id:'https://assets.mixkit.co/videos/31089/31089-360.mp4' },
+    snowmountain: { name:'治愈雪山', id:'https://assets.mixkit.co/videos/9677/9677-720.mp4' },
+    cyberpunk:    { name:'虚拟夜之城', id:'https://assets.mixkit.co/videos/49846/49846-360.mp4' }
   };
   var DEFAULT_SCENE = 'chongqing';
-  var VIDEO_RATIO = 16 / 9; // 若替换为竖屏或其他比例素材，请同步修改此值
 
-  var bgFrame = document.getElementById('bg-frame');
+  var videos = [document.getElementById('bg-video-1'), document.getElementById('bg-video-2')];
+  var activeIndex = 0;
   var sceneButtons = document.querySelectorAll('.scene-btn[data-scene]');
 
   // ============================================================
-  // 2. 背景 iframe「等比满铺裁切」算法
-  //    保证任何分辨率下都 100% 覆盖屏幕，绝无黑边 / 白边 / 拉伸
-  // ============================================================
-  function fitBackground(){
-    var winW = window.innerWidth;
-    var winH = window.innerHeight;
-    var winRatio = winW / winH;
-    var w, h;
-
-    if (winRatio > VIDEO_RATIO) {
-      w = winW;
-      h = w / VIDEO_RATIO;
-    } else {
-      h = winH;
-      w = h * VIDEO_RATIO;
-    }
-
-    w *= 1.02;
-    h *= 1.02;
-
-    bgFrame.style.width  = w + 'px';
-    bgFrame.style.height = h + 'px';
-  }
-
-  window.addEventListener('resize', fitBackground);
-  window.addEventListener('orientationchange', function(){
-    setTimeout(fitBackground, 200);
-  });
-  fitBackground();
-
-  // ============================================================
-  // 3. 场景切换
+  // 2. 平滑无闪烁切换：双 <video> 交叉淡入淡出
+  //    下一个视频在后台加载完成（canplay）后才开始播放与淡入，
+  //    旧视频待完全淡出后才暂停，因此切换全程不会出现黑屏或闪烁
   // ============================================================
   function switchScene(key){
     var scene = SCENES[key];
     if (!scene) return;
 
-    bgFrame.style.opacity = '0';
-    setTimeout(function(){
-      bgFrame.src = scene.src;
-      fitBackground();
-      bgFrame.style.opacity = '1';
-    }, 350);
+    var activeVideo = videos[activeIndex];
+    var nextIndex   = 1 - activeIndex;
+    var nextVideo   = videos[nextIndex];
+
+    function onReady(){
+      nextVideo.removeEventListener('canplay', onReady);
+      var playPromise = nextVideo.play();
+      if (playPromise && playPromise.catch){ playPromise.catch(function(){}); }
+
+      nextVideo.classList.add('active');
+      activeVideo.classList.remove('active');
+      activeIndex = nextIndex;
+
+      // 等旧视频完全淡出（与 CSS 的 1.2s 过渡时间对应）后再暂停，节省性能
+      setTimeout(function(){
+        activeVideo.pause();
+      }, 1300);
+    }
+
+    nextVideo.addEventListener('canplay', onReady);
+    nextVideo.src = scene.id;
+    nextVideo.load();
 
     sceneButtons.forEach(function(btn){
       btn.classList.toggle('active', btn.dataset.scene === key);
@@ -583,7 +567,7 @@
   switchScene(DEFAULT_SCENE);
 
   // ============================================================
-  // 4. 智能隐形逻辑（鼠标静止 3 秒自动隐藏）
+  // 3. 智能隐形逻辑（鼠标静止 3 秒自动隐藏）
   // ============================================================
   var hideTimer = null;
   var HIDE_DELAY = 3000;
@@ -608,7 +592,7 @@
   window.addEventListener('contextmenu', function(e){ e.preventDefault(); });
 
   // ============================================================
-  // 5. 冥想发呆 —— 时长选择气泡菜单
+  // 4. 冥想发呆 —— 时长选择气泡菜单
   // ============================================================
   var meditateBtn   = document.getElementById('meditateBtn');
   var timePicker    = document.getElementById('timePicker');
@@ -654,7 +638,7 @@
   });
 
   // ============================================================
-  // 6. 进入冥想（开启精神留白）—— 呼吸引导气泡
+  // 5. 进入冥想（开启精神留白）—— 呼吸引导气泡
   // ============================================================
   var meditationLayer = document.getElementById('meditationLayer');
   var breathText       = document.getElementById('breathText');
@@ -668,12 +652,12 @@
     remainingSeconds = minutes * 60;
     updateCountdownDisplay();
 
-    // 6.1 主界面在 1 秒内彻底冻结、淡出（由 body.meditating 的 CSS 强制接管）
+    // 5.1 主界面在 1 秒内彻底冻结、淡出（由 body.meditating 的 CSS 强制接管）
     document.body.classList.add('meditating');
     document.body.classList.remove('ui-visible');
     clearTimeout(hideTimer);
 
-    // 6.2 短暂停顿后，呼吸气泡缓缓浮现，强化仪式感
+    // 5.2 短暂停顿后，呼吸气泡缓缓浮现，强化仪式感
     setTimeout(function(){
       meditationLayer.classList.add('active');
       startBreathCycle();
@@ -714,7 +698,7 @@
   }
 
   // ============================================================
-  // 7. 优雅退出：倒计时结束 / Esc / 手机双击
+  // 6. 优雅退出：倒计时结束 / Esc / 手机双击
   // ============================================================
   function endMeditation(){
     clearInterval(countdownTimer);
@@ -729,7 +713,7 @@
       selectedMinutes = null;
       durationBtns.forEach(function(b){ b.classList.remove('selected'); });
       startBtn.classList.remove('enabled');
-      wake(); // 解冻并重新激活鼠标静止淡出监听，无缝回到第一步的隐形状态
+      wake(); // 解冻并重新激活鼠标静止淡出监听，无缝回到隐形状态
     }, 1200);
   }
 
