@@ -40,7 +40,9 @@
     width:auto;
     height:auto;
     object-fit:cover;
-    z-index:-1;
+    z-index:0;                /* 改用 0 而非负数 —— 负 z-index 叠加 <video> 在 Chromium 上
+                                  有已知的 GPU 合成层顺序 bug，容易导致视频被错误地画到
+                                  画布背景之下，表现为“明明在播放却是纯黑” */
     pointer-events:none;      /* 关键防干扰：彻底禁止对背景视频的任何点击/长按交互 */
     user-select:none;
     opacity:0;
