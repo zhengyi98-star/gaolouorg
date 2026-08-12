@@ -274,6 +274,118 @@
     pointer-events:none !important;
   }
 
+  /* ============ 支持我们 · 赞助/好物推荐气泡菜单 ============ */
+  /* 与 .time-picker 同一套毛玻璃语言，保持视觉统一；默认不参与 3 秒静止隐形，
+     仅在用户主动点开时出现，关闭方式与冥想时长菜单完全一致 */
+
+  .support-panel{
+    position:fixed;
+    left:50%;
+    bottom:calc(6vh + 74px);
+    transform:translateX(-50%) translateY(8px);
+    z-index:13;
+    min-width:250px;
+    max-width:86vw;
+    padding:18px 20px;
+    border-radius:22px;
+    background:rgba(255,255,255,0.07);
+    border:1px solid rgba(255,255,255,0.15);
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    box-shadow: 0 10px 34px rgba(0,0,0,0.32);
+    display:flex;
+    flex-direction:column;
+    align-items:stretch;
+    gap:12px;
+    opacity:0;
+    pointer-events:none;
+    transition: opacity 0.45s var(--ease-slow), transform 0.45s var(--ease-slow);
+  }
+  .support-panel.open{
+    opacity:1;
+    pointer-events:auto;
+    transform:translateX(-50%) translateY(0);
+  }
+  body.meditating .support-panel{
+    opacity:0 !important;
+    pointer-events:none !important;
+  }
+
+  .support-panel__label{
+    font-size:0.68rem;
+    letter-spacing:0.2em;
+    font-weight:300;
+    color:rgba(255,255,255,0.5);
+    text-align:center;
+  }
+
+  .support-panel__afdian{
+    display:block;
+    text-align:center;
+    text-decoration:none;
+    font-family:inherit;
+    font-weight:300;
+    font-size:0.8rem;
+    letter-spacing:0.08em;
+    color:rgba(255,255,255,0.92);
+    background:rgba(255,255,255,0.1);
+    border:1px solid rgba(255,255,255,0.35);
+    border-radius:999px;
+    padding:9px 18px;
+    transition: background 0.4s ease, border-color 0.4s ease;
+  }
+  .support-panel__afdian:hover{
+    background:rgba(255,255,255,0.18);
+    border-color:rgba(255,255,255,0.6);
+  }
+
+  .support-panel__divider{
+    width:100%;
+    height:1px;
+    background:rgba(255,255,255,0.12);
+    margin:2px 0;
+  }
+
+  .support-panel__goods-label{
+    font-size:0.62rem;
+    letter-spacing:0.18em;
+    font-weight:300;
+    color:rgba(255,255,255,0.4);
+    text-align:center;
+  }
+
+  .support-panel__goods{
+    display:flex;
+    flex-wrap:wrap;
+    justify-content:center;
+    gap:8px;
+  }
+
+  .support-panel__goods a{
+    text-decoration:none;
+    font-family:inherit;
+    font-weight:300;
+    font-size:0.72rem;
+    letter-spacing:0.05em;
+    color:rgba(255,255,255,0.7);
+    border:1px solid rgba(255,255,255,0.2);
+    border-radius:999px;
+    padding:6px 13px;
+    transition: color 0.4s ease, border-color 0.4s ease;
+  }
+  .support-panel__goods a:hover{
+    color:rgba(255,255,255,0.98);
+    border-color:rgba(255,255,255,0.5);
+  }
+
+  .support-panel__disclosure{
+    font-size:0.58rem;
+    letter-spacing:0.04em;
+    color:rgba(255,255,255,0.28);
+    text-align:center;
+    line-height:1.5;
+  }
+
   .time-picker__label{
     font-size:0.68rem;
     letter-spacing:0.2em;
@@ -415,6 +527,7 @@
     .scene-btn{ width:38px; height:38px; }
     .scene-btn__label{ display:none; } /* 触屏无 hover，隐藏文字气泡 */
     .time-picker{ bottom:calc(5vh + 66px); min-width:210px; }
+    .support-panel{ bottom:calc(5vh + 66px); min-width:210px; }
   }
 
   /* 无障碍：尊重系统的“减少动态效果”偏好 */
@@ -480,8 +593,37 @@
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.6"/><circle cx="12" cy="12" r="6.4" stroke-opacity="0.55"/><circle cx="12" cy="12" r="10" stroke-opacity="0.28"/></svg>
       </button>
 
+      <div class="panel-divider"></div>
+
+      <button class="scene-btn" id="supportBtn" aria-label="支持我们">
+        <span class="scene-btn__label">支持我们</span>
+        <svg viewBox="0 0 24 24"><path d="M12 20.3S3.6 15 3.6 9.3C3.6 6.1 6 4 8.6 4c1.6 0 3.1.8 3.9 2.2C13.3 4.8 14.8 4 16.4 4c2.6 0 5 2.1 5 5.3 0 5.7-8.4 11-8.4 11z"/></svg>
+      </button>
+
     </div>
 
+  </div>
+
+  <!-- ============ 支持我们 · 赞助与好物推荐气泡菜单 ============ -->
+  <div class="support-panel" id="supportPanel">
+    <div class="support-panel__label">留下一份心意</div>
+
+    <!-- 爱发电：请把下面的链接换成你自己的爱发电主页地址 -->
+    <a class="support-panel__afdian" href="https://afdian.com/a/YOUR_AFDIAN_ID" target="_blank" rel="noopener noreferrer">
+      爱发电 · 请我们喝杯茶
+    </a>
+
+    <div class="support-panel__divider"></div>
+
+    <div class="support-panel__goods-label">禅意好物</div>
+    <div class="support-panel__goods">
+      <!-- 淘宝联盟 / 京东联盟生成的推广链接放这里，条目可以任意增减 -->
+      <a href="YOUR_TAOBAO_AFFILIATE_LINK" target="_blank" rel="noopener noreferrer sponsored">冥想坐垫</a>
+      <a href="YOUR_JD_AFFILIATE_LINK" target="_blank" rel="noopener noreferrer sponsored">香薰机</a>
+      <a href="YOUR_TAOBAO_AFFILIATE_LINK_2" target="_blank" rel="noopener noreferrer sponsored">助眠眼罩</a>
+    </div>
+
+    <div class="support-panel__disclosure">部分链接为推广 / 联盟营销链接，点击并购买可能为本站带来收益</div>
   </div>
 
   <!-- ============ 冥想时长选择气泡菜单 ============ -->
@@ -508,19 +650,68 @@
 (function(){
 
   // ============================================================
-  // 1. 场景配置 —— 纯净无广告的 MP4 直链占位素材（Mixkit 免版权片库）
-  //    id 字段即为可直接播放的视频直链，替换为你自己的素材时
-  //    只需保证是 https 直链、体积不大、可循环播放即可
+  // 1. 场景配置 —— 每个场景可以挂任意数量的视频，素材库大小完全灵活，
+  //    往数组里加/删链接即可，不用碰下面的任何逻辑代码。
+  //    每次切换到某个场景时会从对应数组里随机抽一条播放，
+  //    且会避开"刚刚放过的那一条"，让老用户多次访问也不容易看腻。
   // ============================================================
   var SCENES = {
-    // 已改为同源自建托管路径，对应 public/videos/ 目录下的文件
-    // 如果你的实际文件名不同，请把下面的路径改成与文件名完全一致（含大小写）
-    chongqing:    { name:'魔幻重庆', id:'/videos/chongqing.mp4' },
-    shanghai:     { name:'都市上海', id:'/videos/shanghai.mp4' },
-    snowmountain: { name:'治愈雪山', id:'/videos/snowmountain.mp4' },
-    cyberpunk:    { name:'虚拟夜之城', id:'/videos/cyberpunk.mp4' }
+    chongqing: {
+      name:'魔幻重庆',
+      videos:[
+        '/videos/chongqing-1.mp4',
+        '/videos/chongqing-2.mp4',
+        '/videos/chongqing-3.mp4'
+        // 继续往下加即可，如 '/videos/chongqing-4.mp4', ...
+      ]
+    },
+    shanghai: {
+      name:'都市上海',
+      videos:[
+        '/videos/shanghai-1.mp4',
+        '/videos/shanghai-2.mp4',
+        '/videos/shanghai-3.mp4'
+      ]
+    },
+    snowmountain: {
+      name:'治愈雪山',
+      videos:[
+        '/videos/snowmountain-1.mp4',
+        '/videos/snowmountain-2.mp4',
+        '/videos/snowmountain-3.mp4'
+      ]
+    },
+    cyberpunk: {
+      name:'虚拟夜之城',
+      videos:[
+        '/videos/cyberpunk-1.mp4',
+        '/videos/cyberpunk-2.mp4',
+        '/videos/cyberpunk-3.mp4'
+      ]
+    }
   };
-  var DEFAULT_SCENE = 'chongqing';
+
+  var SCENE_KEYS = Object.keys(SCENES);
+  // 每次打开网站，起始场景也随机挑一个分类，配合场景内随机选片，
+  // 让"多次登录不觉得单调"从进站第一眼就成立
+  var DEFAULT_SCENE = SCENE_KEYS[Math.floor(Math.random() * SCENE_KEYS.length)];
+
+  // 记住每个场景上一次放过的是哪一条，抽取时尽量避开，减少"刚看过又是它"的重复感
+  var lastPlayedIndex = {};
+
+  function pickVideoSrc(key){
+    var list = SCENES[key] && SCENES[key].videos;
+    if (!list || !list.length) return null;
+    if (list.length === 1) return list[0];
+
+    var idx;
+    do {
+      idx = Math.floor(Math.random() * list.length);
+    } while (idx === lastPlayedIndex[key]);
+
+    lastPlayedIndex[key] = idx;
+    return list[idx];
+  }
 
   var videos = [document.getElementById('bg-video-1'), document.getElementById('bg-video-2')];
   var activeIndex = 0;
@@ -546,6 +737,9 @@
   function switchScene(key){
     var scene = SCENES[key];
     if (!scene) return;
+
+    var pickedSrc = pickVideoSrc(key);
+    if (!pickedSrc) return;
 
     var activeVideo = videos[activeIndex];
     var nextIndex   = 1 - activeIndex;
@@ -585,12 +779,12 @@
     // 3 秒硬性兜底：即使两个事件都没等到，也强制显示，避免无限期黑屏
     fallbackTimer = setTimeout(function(){
       if (!triggered){
-        console.warn('[高楼之巅] 视频 3 秒内未触发 loadeddata/canplay，已强制显示：', scene.id);
+        console.warn('[高楼之巅] 视频 3 秒内未触发 loadeddata/canplay，已强制显示：', pickedSrc);
       }
       onReady();
     }, 3000);
 
-    nextVideo.src = scene.id;
+    nextVideo.src = pickedSrc;
     nextVideo.load();
 
     sceneButtons.forEach(function(btn){
@@ -632,20 +826,42 @@
   window.addEventListener('contextmenu', function(e){ e.preventDefault(); });
 
   // ============================================================
-  // 4. 冥想发呆 —— 时长选择气泡菜单
+  // 4. 冥想发呆 —— 时长选择气泡菜单 ｜ 支持我们 —— 赞助与好物气泡菜单
+  //    两个气泡菜单共用同一套“互斥展开、点外部收起”的逻辑
   // ============================================================
   var meditateBtn   = document.getElementById('meditateBtn');
   var timePicker    = document.getElementById('timePicker');
   var durationBtns  = document.querySelectorAll('.time-picker__option');
   var startBtn      = document.getElementById('startMeditation');
 
+  var supportBtn    = document.getElementById('supportBtn');
+  var supportPanel  = document.getElementById('supportPanel');
+
   var selectedMinutes = null;
+
+  function closeTimePicker(){
+    timePicker.classList.remove('open');
+    meditateBtn.classList.remove('active');
+  }
+  function closeSupportPanel(){
+    supportPanel.classList.remove('open');
+    supportBtn.classList.remove('active');
+  }
 
   meditateBtn.addEventListener('click', function(e){
     e.stopPropagation();
     var willOpen = !timePicker.classList.contains('open');
+    closeSupportPanel();
     timePicker.classList.toggle('open', willOpen);
     meditateBtn.classList.toggle('active', willOpen);
+  });
+
+  supportBtn.addEventListener('click', function(e){
+    e.stopPropagation();
+    var willOpen = !supportPanel.classList.contains('open');
+    closeTimePicker();
+    supportPanel.classList.toggle('open', willOpen);
+    supportBtn.classList.toggle('active', willOpen);
   });
 
   durationBtns.forEach(function(btn){
@@ -661,19 +877,21 @@
   startBtn.addEventListener('click', function(e){
     e.stopPropagation();
     if (!selectedMinutes) return;
-    timePicker.classList.remove('open');
-    meditateBtn.classList.remove('active');
+    closeTimePicker();
     startMeditation(selectedMinutes);
   });
 
-  // 点击气泡菜单以外的区域，优雅收起
+  // 点击任一气泡菜单以外的区域，优雅收起（两个菜单共用这一套判断）
   document.addEventListener('click', function(e){
     if (timePicker.classList.contains('open') &&
         !timePicker.contains(e.target) &&
-        e.target !== meditateBtn &&
         !meditateBtn.contains(e.target)){
-      timePicker.classList.remove('open');
-      meditateBtn.classList.remove('active');
+      closeTimePicker();
+    }
+    if (supportPanel.classList.contains('open') &&
+        !supportPanel.contains(e.target) &&
+        !supportBtn.contains(e.target)){
+      closeSupportPanel();
     }
   });
 
@@ -693,6 +911,7 @@
     updateCountdownDisplay();
 
     // 5.1 主界面在 1 秒内彻底冻结、淡出（由 body.meditating 的 CSS 强制接管）
+    closeSupportPanel();
     document.body.classList.add('meditating');
     document.body.classList.remove('ui-visible');
     clearTimeout(hideTimer);
