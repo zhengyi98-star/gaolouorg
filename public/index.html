@@ -547,11 +547,22 @@
     var activeVideo = videos[activeIndex];
     var nextIndex   = 1 - activeIndex;
     var nextVideo   = videos[nextIndex];
+    var triggered   = false;
+    var fallbackTimer = null;
 
     function onReady(){
+      if (triggered) return;
+      triggered = true;
+      nextVideo.removeEventListener('loadeddata', onReady);
       nextVideo.removeEventListener('canplay', onReady);
+      clearTimeout(fallbackTimer);
+
       var playPromise = nextVideo.play();
-      if (playPromise && playPromise.catch){ playPromise.catch(function(){}); }
+      if (playPromise && playPromise.catch){
+        playPromise.catch(function(err){
+          console.warn('[高楼之巅] 视频播放被浏览器拦截或失败：', err, nextVideo.currentSrc);
+        });
+      }
 
       nextVideo.classList.add('active');
       activeVideo.classList.remove('active');
@@ -563,7 +574,19 @@
       }, 1300);
     }
 
+    // 双重监听：loadeddata（首帧可用）和 canplay（可流畅播放）任一先触发即可，
+    // 避免某些浏览器/编码组合下 canplay 迟迟不触发导致画面卡在黑屏
+    nextVideo.addEventListener('loadeddata', onReady);
     nextVideo.addEventListener('canplay', onReady);
+
+    // 3 秒硬性兜底：即使两个事件都没等到，也强制显示，避免无限期黑屏
+    fallbackTimer = setTimeout(function(){
+      if (!triggered){
+        console.warn('[高楼之巅] 视频 3 秒内未触发 loadeddata/canplay，已强制显示：', scene.id);
+      }
+      onReady();
+    }, 3000);
+
     nextVideo.src = scene.id;
     nextVideo.load();
 
