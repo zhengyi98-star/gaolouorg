@@ -53,15 +53,16 @@
     opacity:1;
   }
 
-  /* 夜间遮罩滤镜层：压暗视频，保证悬浮文字清晰可读 */
+  /* 夜间遮罩滤镜层：压暗视频，保证悬浮文字清晰可读
+     注意：这里刻意不用 backdrop-filter —— 它在采样 <video> 元素背后画面时
+     在 Chromium 上有已知问题（视频常被提升到独立合成层，backdrop-filter 采样不到，
+     导致整层渲染成纯黑），改用纯色半透明叠加来压暗，效果一致且稳定可靠 */
   #bg-veil{
     position:fixed;
     inset:0;
     z-index:1;
     pointer-events:none;
-    background: rgba(0,0,0,0.28);
-    backdrop-filter: brightness(0.62) saturate(1.05);
-    -webkit-backdrop-filter: brightness(0.62) saturate(1.05);
+    background: rgba(0,0,0,0.42);
   }
 
   /* 极轻的四角暗角，增加纵深与高级感 */
