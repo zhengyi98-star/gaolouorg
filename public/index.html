@@ -667,13 +667,20 @@
   var lastPlayedIndex = {};
 
   // 数组里每一项既可以是纯字符串（只有视频地址），
-  // 也可以写成 { src:'...mp4', poster:'...jpg' } 附带一张海报图 ——
-  // 海报图体积小、加载几乎瞬时，浏览器会先秒开显示它，
-  // 视频真正解码出画面后再无缝替换上去，比“干等视频缓冲”观感快得多
+  // 也可以写成 { src:'...mp4', poster:'...jpg' } 手动指定一张海报图；
+  // 但更省心的是下面的“同名约定”：只要在视频同一目录放一张文件名相同、
+  // 后缀是 .jpg 的图（比如 chongqing-1.mp4 配 chongqing-1.jpg），
+  // 代码会自动探测到并优先使用，完全不用在这里手动写 poster 字段
   function normalizeEntry(entry){
     if (!entry) return null;
     if (typeof entry === 'string') return { src: entry, poster: '' };
     return { src: entry.src, poster: entry.poster || '' };
+  }
+
+  // 按“同名约定”推导海报图路径：/videos/chongqing-1.mp4 → /videos/chongqing-1.jpg
+  function derivePosterPath(src){
+    var m = src.match(/^(.*)\.[a-zA-Z0-9]+$/);
+    return m ? (m[1] + '.jpg') : null;
   }
 
   function pickVideoSrc(key){
@@ -752,20 +759,7 @@
       reveal();
     }
 
-    if (picked.poster){
-      nextVideo.poster = picked.poster;
-    } else {
-      nextVideo.removeAttribute('poster');
-    }
-
-    nextVideo.src = picked.src;
-    nextVideo.load();
-
-    if (picked.poster){
-      // 有海报图垫底，不必等视频真正就绪，直接显示，观感是“秒开”
-      triggered = true;
-      reveal();
-    } else {
+    function gatedReveal(){
       // 双重监听：loadeddata（首帧可用）和 canplay（可流畅播放）任一先触发即可，
       // 避免某些浏览器/编码组合下 canplay 迟迟不触发导致画面卡在黑屏
       nextVideo.addEventListener('loadeddata', onReady);
@@ -778,6 +772,31 @@
         }
         onReady();
       }, 3000);
+    }
+
+    nextVideo.src = picked.src;
+    nextVideo.load();
+
+    // 自动探测同名海报图：手动指定的 poster 优先，否则按“同名约定”推导，
+    // 探测图片能加载出来才会“秒开”，加载失败就静默退回安全的等待模式，
+    // 不会因为没有海报图而黑屏或报错
+    var posterPath = picked.poster || derivePosterPath(picked.src);
+    if (posterPath){
+      var probe = new Image();
+      probe.onload = function(){
+        if (triggered) return;
+        triggered = true;
+        clearTimeout(fallbackTimer);
+        nextVideo.poster = posterPath;
+        reveal();
+      };
+      probe.onerror = function(){
+        nextVideo.removeAttribute('poster');
+        gatedReveal();
+      };
+      probe.src = posterPath;
+    } else {
+      gatedReveal();
     }
 
     sceneButtons.forEach(function(btn){
