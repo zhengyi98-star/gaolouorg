@@ -28,21 +28,21 @@
   }
 
   /* ============ 原生 <video> 背景层 ============ */
-  /* 纯 CSS 满铺裁切方案：min-width/min-height 保证视频永远盖满视口，
-     object-fit: cover 负责按比例裁切多余部分，双重保险杜绝黑边、白边与拉伸 */
+  /* 满铺裁切方案：直接把视频框定为 100vw × 100vh，再用 object-fit: cover 裁切，
+     不管视频原始分辨率或宽高比是多少都能正确居中裁切满屏。
+     （注：之前用的是 min-width/min-height:100% + width/height:auto 的老技巧，
+     这套写法在源视频宽高比与屏幕差异较大、尤其是高分辨率素材时，
+     会把视频框撑得远大于视口，叠加 object-fit:cover 后只截取到其中一角，
+     这正是“视频显示不全、只看到一个角落”的根因，现已彻底改用更稳健的写法） */
 
   .bg-video{
     position:fixed;
-    right:0;
-    bottom:0;
-    min-width:100%;
-    min-height:100%;
-    width:auto;
-    height:auto;
+    top:0;
+    left:0;
+    width:100vw;
+    height:100vh;
     object-fit:cover;
-    z-index:0;                /* 改用 0 而非负数 —— 负 z-index 叠加 <video> 在 Chromium 上
-                                  有已知的 GPU 合成层顺序 bug，容易导致视频被错误地画到
-                                  画布背景之下，表现为“明明在播放却是纯黑” */
+    z-index:0;
     pointer-events:none;      /* 关键防干扰：彻底禁止对背景视频的任何点击/长按交互 */
     user-select:none;
     opacity:0;
@@ -339,52 +339,11 @@
     border-color:rgba(255,255,255,0.6);
   }
 
-  .support-panel__divider{
-    width:100%;
-    height:1px;
-    background:rgba(255,255,255,0.12);
-    margin:2px 0;
-  }
-
-  .support-panel__goods-label{
-    font-size:0.62rem;
-    letter-spacing:0.18em;
-    font-weight:300;
-    color:rgba(255,255,255,0.4);
-    text-align:center;
-  }
-
-  .support-panel__goods{
-    display:flex;
-    flex-wrap:wrap;
-    justify-content:center;
-    gap:8px;
-  }
-
-  .support-panel__goods a{
-    text-decoration:none;
-    font-family:inherit;
-    font-weight:300;
-    font-size:0.72rem;
-    letter-spacing:0.05em;
-    color:rgba(255,255,255,0.7);
-    border:1px solid rgba(255,255,255,0.2);
-    border-radius:999px;
-    padding:6px 13px;
-    transition: color 0.4s ease, border-color 0.4s ease;
-  }
-  .support-panel__goods a:hover{
-    color:rgba(255,255,255,0.98);
-    border-color:rgba(255,255,255,0.5);
-  }
-
-  .support-panel__disclosure{
-    font-size:0.58rem;
-    letter-spacing:0.04em;
-    color:rgba(255,255,255,0.28);
-    text-align:center;
-    line-height:1.5;
-  }
+  /* ============ 背景音乐开关图标 ============ */
+  /* 默认显示“静音”图标；点开后切到“播放中”图标，两者互斥显示 */
+  .scene-btn .icon-music-on{ display:none; }
+  .scene-btn.active .icon-music-off{ display:none; }
+  .scene-btn.active .icon-music-on{ display:block; }
 
   .time-picker__label{
     font-size:0.68rem;
@@ -541,8 +500,14 @@
 <body>
 
   <!-- ============ 原生 HTML5 视频背景（已彻底移除 iframe，无第三方广告/跳转）============ -->
+  <!-- poster 建议填一张与视频首帧接近的静态图（JPG，几十 KB 即可），
+       浏览器会在视频真正解码出画面之前先瞬时显示这张图，切换观感会快很多 -->
   <video id="bg-video-1" class="bg-video" autoplay loop muted playsinline preload="auto"></video>
   <video id="bg-video-2" class="bg-video" autoplay loop muted playsinline preload="auto"></video>
+
+  <!-- ============ 背景音乐（默认不自动播放，需用户手动点开）============ -->
+  <!-- 换成你自己下载好、放进 public/audio/ 的曲目路径即可 -->
+  <audio id="bgAudio" src="/audio/ambient.mp3" loop preload="none"></audio>
 
   <div id="bg-veil"></div>
   <div id="bg-vignette"></div>
@@ -600,30 +565,32 @@
         <svg viewBox="0 0 24 24"><path d="M12 20.3S3.6 15 3.6 9.3C3.6 6.1 6 4 8.6 4c1.6 0 3.1.8 3.9 2.2C13.3 4.8 14.8 4 16.4 4c2.6 0 5 2.1 5 5.3 0 5.7-8.4 11-8.4 11z"/></svg>
       </button>
 
+      <div class="panel-divider"></div>
+
+      <button class="scene-btn" id="musicBtn" aria-label="背景音乐">
+        <span class="scene-btn__label" id="musicLabel">背景音乐</span>
+        <svg class="icon-music-off" viewBox="0 0 24 24">
+          <path d="M4 9v6h4l5 4V5L8 9H4z"/>
+          <line x1="16" y1="9" x2="21" y2="15"/>
+          <line x1="21" y1="9" x2="16" y2="15"/>
+        </svg>
+        <svg class="icon-music-on" viewBox="0 0 24 24">
+          <path d="M4 9v6h4l5 4V5L8 9H4z"/>
+          <path d="M16 9a4 4 0 0 1 0 6"/>
+          <path d="M18.5 6.5a8 8 0 0 1 0 11"/>
+        </svg>
+      </button>
+
     </div>
 
   </div>
 
-  <!-- ============ 支持我们 · 赞助与好物推荐气泡菜单 ============ -->
+  <!-- ============ 支持我们 · 赞助气泡菜单 ============ -->
   <div class="support-panel" id="supportPanel">
     <div class="support-panel__label">留下一份心意</div>
-
-    <!-- 爱发电：请把下面的链接换成你自己的爱发电主页地址 -->
-    <a class="support-panel__afdian" href="https://afdian.com/a/YOUR_AFDIAN_ID" target="_blank" rel="noopener noreferrer">
+    <a class="support-panel__afdian" href="https://afdian.com/a/zhengyi98" target="_blank" rel="noopener noreferrer">
       爱发电 · 请我们喝杯茶
     </a>
-
-    <div class="support-panel__divider"></div>
-
-    <div class="support-panel__goods-label">禅意好物</div>
-    <div class="support-panel__goods">
-      <!-- 淘宝联盟 / 京东联盟生成的推广链接放这里，条目可以任意增减 -->
-      <a href="YOUR_TAOBAO_AFFILIATE_LINK" target="_blank" rel="noopener noreferrer sponsored">冥想坐垫</a>
-      <a href="YOUR_JD_AFFILIATE_LINK" target="_blank" rel="noopener noreferrer sponsored">香薰机</a>
-      <a href="YOUR_TAOBAO_AFFILIATE_LINK_2" target="_blank" rel="noopener noreferrer sponsored">助眠眼罩</a>
-    </div>
-
-    <div class="support-panel__disclosure">部分链接为推广 / 联盟营销链接，点击并购买可能为本站带来收益</div>
   </div>
 
   <!-- ============ 冥想时长选择气泡菜单 ============ -->
@@ -661,8 +628,7 @@
       videos:[
         '/videos/chongqing-1.mp4',
         '/videos/chongqing-2.mp4',
-        '/videos/chongqing-3.mp4',
-        '/videos/chongqing-4.mp4'
+        '/videos/chongqing-3.mp4'
         // 继续往下加即可，如 '/videos/chongqing-4.mp4', ...
       ]
     },
@@ -671,8 +637,7 @@
       videos:[
         '/videos/shanghai-1.mp4',
         '/videos/shanghai-2.mp4',
-        '/videos/shanghai-3.mp4',
-        '/videos/shanghai-4.mp4'
+        '/videos/shanghai-3.mp4'
       ]
     },
     snowmountain: {
@@ -680,8 +645,7 @@
       videos:[
         '/videos/snowmountain-1.mp4',
         '/videos/snowmountain-2.mp4',
-        '/videos/snowmountain-3.mp4',
-        '/videos/snowmountain-4.mp4'
+        '/videos/snowmountain-3.mp4'
       ]
     },
     cyberpunk: {
@@ -689,8 +653,7 @@
       videos:[
         '/videos/cyberpunk-1.mp4',
         '/videos/cyberpunk-2.mp4',
-        '/videos/cyberpunk-3.mp4',
-        '/videos/cyberpunk-4.mp4'
+        '/videos/cyberpunk-3.mp4'
       ]
     }
   };
@@ -703,10 +666,20 @@
   // 记住每个场景上一次放过的是哪一条，抽取时尽量避开，减少"刚看过又是它"的重复感
   var lastPlayedIndex = {};
 
+  // 数组里每一项既可以是纯字符串（只有视频地址），
+  // 也可以写成 { src:'...mp4', poster:'...jpg' } 附带一张海报图 ——
+  // 海报图体积小、加载几乎瞬时，浏览器会先秒开显示它，
+  // 视频真正解码出画面后再无缝替换上去，比“干等视频缓冲”观感快得多
+  function normalizeEntry(entry){
+    if (!entry) return null;
+    if (typeof entry === 'string') return { src: entry, poster: '' };
+    return { src: entry.src, poster: entry.poster || '' };
+  }
+
   function pickVideoSrc(key){
     var list = SCENES[key] && SCENES[key].videos;
     if (!list || !list.length) return null;
-    if (list.length === 1) return list[0];
+    if (list.length === 1) return normalizeEntry(list[0]);
 
     var idx;
     do {
@@ -714,7 +687,7 @@
     } while (idx === lastPlayedIndex[key]);
 
     lastPlayedIndex[key] = idx;
-    return list[idx];
+    return normalizeEntry(list[idx]);
   }
 
   var videos = [document.getElementById('bg-video-1'), document.getElementById('bg-video-2')];
@@ -735,15 +708,16 @@
 
   // ============================================================
   // 2. 平滑无闪烁切换：双 <video> 交叉淡入淡出
-  //    下一个视频在后台加载完成（canplay）后才开始播放与淡入，
-  //    旧视频待完全淡出后才暂停，因此切换全程不会出现黑屏或闪烁
+  //    有海报图时立即显示（海报秒开，真实画面解码好后无缝替换）；
+  //    没有海报图时退回“等 loadeddata/canplay 就绪再显示”的安全策略，
+  //    两种情况都绝不会露出黑屏或闪烁
   // ============================================================
   function switchScene(key){
     var scene = SCENES[key];
     if (!scene) return;
 
-    var pickedSrc = pickVideoSrc(key);
-    if (!pickedSrc) return;
+    var picked = pickVideoSrc(key);
+    if (!picked) return;
 
     var activeVideo = videos[activeIndex];
     var nextIndex   = 1 - activeIndex;
@@ -751,13 +725,7 @@
     var triggered   = false;
     var fallbackTimer = null;
 
-    function onReady(){
-      if (triggered) return;
-      triggered = true;
-      nextVideo.removeEventListener('loadeddata', onReady);
-      nextVideo.removeEventListener('canplay', onReady);
-      clearTimeout(fallbackTimer);
-
+    function reveal(){
       var playPromise = nextVideo.play();
       if (playPromise && playPromise.catch){
         playPromise.catch(function(err){
@@ -775,21 +743,42 @@
       }, 1300);
     }
 
-    // 双重监听：loadeddata（首帧可用）和 canplay（可流畅播放）任一先触发即可，
-    // 避免某些浏览器/编码组合下 canplay 迟迟不触发导致画面卡在黑屏
-    nextVideo.addEventListener('loadeddata', onReady);
-    nextVideo.addEventListener('canplay', onReady);
+    function onReady(){
+      if (triggered) return;
+      triggered = true;
+      nextVideo.removeEventListener('loadeddata', onReady);
+      nextVideo.removeEventListener('canplay', onReady);
+      clearTimeout(fallbackTimer);
+      reveal();
+    }
 
-    // 3 秒硬性兜底：即使两个事件都没等到，也强制显示，避免无限期黑屏
-    fallbackTimer = setTimeout(function(){
-      if (!triggered){
-        console.warn('[高楼之巅] 视频 3 秒内未触发 loadeddata/canplay，已强制显示：', pickedSrc);
-      }
-      onReady();
-    }, 3000);
+    if (picked.poster){
+      nextVideo.poster = picked.poster;
+    } else {
+      nextVideo.removeAttribute('poster');
+    }
 
-    nextVideo.src = pickedSrc;
+    nextVideo.src = picked.src;
     nextVideo.load();
+
+    if (picked.poster){
+      // 有海报图垫底，不必等视频真正就绪，直接显示，观感是“秒开”
+      triggered = true;
+      reveal();
+    } else {
+      // 双重监听：loadeddata（首帧可用）和 canplay（可流畅播放）任一先触发即可，
+      // 避免某些浏览器/编码组合下 canplay 迟迟不触发导致画面卡在黑屏
+      nextVideo.addEventListener('loadeddata', onReady);
+      nextVideo.addEventListener('canplay', onReady);
+
+      // 3 秒硬性兜底：即使两个事件都没等到，也强制显示，避免无限期黑屏
+      fallbackTimer = setTimeout(function(){
+        if (!triggered){
+          console.warn('[高楼之巅] 视频 3 秒内未触发 loadeddata/canplay，已强制显示：', picked.src);
+        }
+        onReady();
+      }, 3000);
+    }
 
     sceneButtons.forEach(function(btn){
       btn.classList.toggle('active', btn.dataset.scene === key);
@@ -803,6 +792,29 @@
   });
 
   switchScene(DEFAULT_SCENE);
+
+  // 浏览器空闲时，把其余几个分类各预取一条视频的字节缓存到本地，
+  // 之后用户点击那些按钮时大概率直接命中缓存，切换会明显更快。
+  // 只预取“一条”而不是全部素材库，避免无谓占用用户的移动网络流量
+  function prefetchOtherScenes(currentKey){
+    SCENE_KEYS.forEach(function(k){
+      if (k === currentKey) return;
+      var list = SCENES[k] && SCENES[k].videos;
+      if (!list || !list.length) return;
+      var entry = normalizeEntry(list[0]);
+      var link = document.createElement('link');
+      link.rel = 'prefetch';
+      link.as = 'video';
+      link.href = entry.src;
+      document.head.appendChild(link);
+    });
+  }
+
+  if (window.requestIdleCallback){
+    requestIdleCallback(function(){ prefetchOtherScenes(DEFAULT_SCENE); });
+  } else {
+    setTimeout(function(){ prefetchOtherScenes(DEFAULT_SCENE); }, 2000);
+  }
 
   // ============================================================
   // 3. 智能隐形逻辑（鼠标静止 3 秒自动隐藏）
@@ -828,6 +840,57 @@
   wake();
 
   window.addEventListener('contextmenu', function(e){ e.preventDefault(); });
+
+  // ============================================================
+  // 背景音乐：默认不自动播放（浏览器策略也不允许带声音的音频自动播放），
+  // 需要用户主动点开，音量做平滑淡入淡出，不会突兀地“哐”一下出声
+  // ============================================================
+  var bgAudio  = document.getElementById('bgAudio');
+  var musicBtn = document.getElementById('musicBtn');
+  var musicOn  = false;
+  var TARGET_VOLUME = 0.35;
+
+  function fadeVolume(el, from, to, duration, done){
+    var start = null;
+    function step(ts){
+      if (start === null) start = ts;
+      var p = Math.min(1, (ts - start) / duration);
+      el.volume = from + (to - from) * p;
+      if (p < 1){
+        requestAnimationFrame(step);
+      } else if (done){
+        done();
+      }
+    }
+    requestAnimationFrame(step);
+  }
+
+  musicBtn.addEventListener('click', function(){
+    musicOn = !musicOn;
+    musicBtn.classList.toggle('active', musicOn);
+
+    if (musicOn){
+      bgAudio.volume = 0;
+      var playPromise = bgAudio.play();
+      if (playPromise && playPromise.catch){
+        playPromise.catch(function(err){
+          console.warn('[高楼之巅] 背景音乐播放被浏览器拦截或失败：', err);
+        });
+      }
+      fadeVolume(bgAudio, 0, TARGET_VOLUME, 1200);
+    } else {
+      fadeVolume(bgAudio, bgAudio.volume, 0, 800, function(){
+        bgAudio.pause();
+      });
+    }
+  });
+
+  bgAudio.addEventListener('error', function(){
+    console.error(
+      '[高楼之巅] 背景音乐加载失败：' + (bgAudio.currentSrc || bgAudio.src) +
+      '\n请确认音频文件已放进 public/audio/ 目录，且代码里的路径与真实文件名完全一致。'
+    );
+  });
 
   // ============================================================
   // 4. 冥想发呆 —— 时长选择气泡菜单 ｜ 支持我们 —— 赞助与好物气泡菜单
