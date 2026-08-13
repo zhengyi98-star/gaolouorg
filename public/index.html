@@ -437,13 +437,20 @@
     justify-content:center;
     background: radial-gradient(circle at 35% 32%, rgba(255,255,255,0.4), rgba(255,255,255,0.05) 72%);
     border:1px solid rgba(255,255,255,0.4);
-    animation: breathe 8s ease-in-out infinite;
+    animation-name: breathe;
+    animation-iteration-count: infinite;
+    animation-duration: 8s;   /* JS 会按用户调节的速率实时改写这个值 */
     will-change: transform, box-shadow;
   }
 
+  /* 呼吸节奏做成不对称的：吸气（0%→42%）稍快，是主动的肌肉收缩；
+     呼气（42%→100%）更长更缓，是被动的弹性回缩——
+     这跟人真实呼吸时“吸气用力、呼气放松”的力学特征是一致的，
+     配合每个关键帧各自的 easing，让扩张收缩的加减速也更接近有机的肺部运动，
+     而不是机械对称的正弦波 */
   @keyframes breathe{
-    0%   { transform:scale(1);    box-shadow:0 0 20px 4px rgba(255,255,255,0.14), 0 0 46px 14px rgba(255,255,255,0.05); }
-    50%  { transform:scale(1.85); box-shadow:0 0 60px 20px rgba(255,255,255,0.32), 0 0 120px 36px rgba(255,255,255,0.12); }
+    0%   { transform:scale(1);    box-shadow:0 0 20px 4px rgba(255,255,255,0.14), 0 0 46px 14px rgba(255,255,255,0.05); animation-timing-function: cubic-bezier(0.45, 0, 0.4, 1); }
+    42%  { transform:scale(1.85); box-shadow:0 0 60px 20px rgba(255,255,255,0.32), 0 0 120px 36px rgba(255,255,255,0.12); animation-timing-function: cubic-bezier(0.55, 0, 0.35, 1); }
     100% { transform:scale(1);    box-shadow:0 0 20px 4px rgba(255,255,255,0.14), 0 0 46px 14px rgba(255,255,255,0.05); }
   }
 
@@ -462,6 +469,51 @@
     letter-spacing:0.22em;
     color:rgba(255,255,255,0.38);
     font-variant-numeric: tabular-nums;
+  }
+
+  /* ============ 呼吸节奏手动调节 ============ */
+
+  .breath-rate{
+    display:flex;
+    align-items:center;
+    gap:14px;
+    opacity:0.55;
+    transition: opacity 0.3s ease;
+  }
+  .breath-rate:hover{
+    opacity:0.95;
+  }
+
+  .breath-rate__btn{
+    appearance:none;
+    -webkit-appearance:none;
+    background:transparent;
+    border:1px solid rgba(255,255,255,0.28);
+    color:rgba(255,255,255,0.8);
+    width:26px;
+    height:26px;
+    border-radius:50%;
+    font-size:0.85rem;
+    line-height:1;
+    font-family:inherit;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    transition: background 0.35s ease, border-color 0.35s ease;
+  }
+  .breath-rate__btn:hover{
+    background:rgba(255,255,255,0.14);
+    border-color:rgba(255,255,255,0.55);
+  }
+
+  .breath-rate__value{
+    font-size:0.62rem;
+    letter-spacing:0.1em;
+    color:rgba(255,255,255,0.5);
+    font-variant-numeric: tabular-nums;
+    min-width:84px;
+    text-align:center;
   }
 
   .breath-hint{
@@ -506,8 +558,9 @@
   <video id="bg-video-2" class="bg-video" autoplay loop muted playsinline preload="auto"></video>
 
   <!-- ============ 背景音乐（默认不自动播放，需用户手动点开）============ -->
-  <!-- 换成你自己下载好、放进 public/audio/ 的曲目路径即可 -->
-  <audio id="bgAudio" src="/audio/ambient.mp3" loop preload="none"></audio>
+  <!-- 两个 <audio> 交替使用，实现无缝交叉淡入淡出切歌，用法和背景视频完全对称 -->
+  <audio id="bg-audio-1" preload="none"></audio>
+  <audio id="bg-audio-2" preload="none"></audio>
 
   <div id="bg-veil"></div>
   <div id="bg-vignette"></div>
@@ -553,8 +606,8 @@
 
       <div class="panel-divider"></div>
 
-      <button class="scene-btn" id="meditateBtn" aria-label="冥想发呆">
-        <span class="scene-btn__label">冥想发呆</span>
+      <button class="scene-btn" id="meditateBtn" aria-label="云上发呆">
+        <span class="scene-btn__label">云上发呆</span>
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.6"/><circle cx="12" cy="12" r="6.4" stroke-opacity="0.55"/><circle cx="12" cy="12" r="10" stroke-opacity="0.28"/></svg>
       </button>
 
@@ -610,6 +663,13 @@
       <span class="breath-bubble__text" id="breathText">吸气...</span>
     </div>
     <div class="breath-countdown" id="breathCountdown">00:00</div>
+
+    <div class="breath-rate">
+      <button class="breath-rate__btn" id="rateSlower" aria-label="呼吸慢一点">&minus;</button>
+      <span class="breath-rate__value" id="rateValue">7.5 次/分钟</span>
+      <button class="breath-rate__btn" id="rateFaster" aria-label="呼吸快一点">&plus;</button>
+    </div>
+
     <div class="breath-hint">按 Esc 或双击屏幕，随时回到高楼之巅</div>
   </div>
 
@@ -673,8 +733,21 @@
   // 代码会自动探测到并优先使用，完全不用在这里手动写 poster 字段
   function normalizeEntry(entry){
     if (!entry) return null;
-    if (typeof entry === 'string') return { src: entry, poster: '' };
-    return { src: entry.src, poster: entry.poster || '' };
+    if (typeof entry === 'string') return { src: entry, poster: '', srcLow: '' };
+    return { src: entry.src, poster: entry.poster || '', srcLow: entry.srcLow || '' };
+  }
+
+  // 弱网自动降级（可选功能）：某个视频条目如果额外写了 srcLow 字段
+  // （比如同一段素材导出的一个低码率/低分辨率版本），在检测到用户是
+  // 慢网络（2g/3g）或开了"数据节省模式”时，会自动改用这个轻量版本。
+  // 没有配置 srcLow 的条目完全不受影响，照常播放原来的 src
+  function pickBestSrc(entry){
+    var conn = navigator.connection || navigator.webkitConnection || navigator.mozConnection;
+    if (entry.srcLow && conn){
+      var isSlow = conn.saveData || (conn.effectiveType && /2g|3g/.test(conn.effectiveType));
+      if (isSlow) return entry.srcLow;
+    }
+    return entry.src;
   }
 
   // 按“同名约定”推导海报图路径：/videos/chongqing-1.mp4 → /videos/chongqing-1.jpg
@@ -725,6 +798,7 @@
 
     var picked = pickVideoSrc(key);
     if (!picked) return;
+    var actualSrc = pickBestSrc(picked); // 可能因为弱网降级成 srcLow
 
     var activeVideo = videos[activeIndex];
     var nextIndex   = 1 - activeIndex;
@@ -768,13 +842,13 @@
       // 3 秒硬性兜底：即使两个事件都没等到，也强制显示，避免无限期黑屏
       fallbackTimer = setTimeout(function(){
         if (!triggered){
-          console.warn('[高楼之巅] 视频 3 秒内未触发 loadeddata/canplay，已强制显示：', picked.src);
+          console.warn('[高楼之巅] 视频 3 秒内未触发 loadeddata/canplay，已强制显示：', actualSrc);
         }
         onReady();
       }, 3000);
     }
 
-    nextVideo.src = picked.src;
+    nextVideo.src = actualSrc;
     nextVideo.load();
 
     // 自动探测同名海报图：手动指定的 poster 优先，否则按“同名约定”推导，
@@ -862,13 +936,37 @@
   window.addEventListener('contextmenu', function(e){ e.preventDefault(); });
 
   // ============================================================
-  // 背景音乐：默认不自动播放（浏览器策略也不允许带声音的音频自动播放），
-  // 需要用户主动点开，音量做平滑淡入淡出，不会突兀地“哐”一下出声
+  // 背景音乐：像视频一样支持“素材库 + 随机播放”，用双 <audio> 交叉淡入淡出
+  // 实现无缝切歌，一首快放完时提前切下一首，不会有静音空隙。
+  // 默认不自动播放（浏览器策略也不允许带声音的音频自动播放），需要用户主动点开。
+  // 曲库大小完全灵活，往数组里加/删链接即可
   // ============================================================
-  var bgAudio  = document.getElementById('bgAudio');
+  var AUDIO_TRACKS = [
+    '/audio/ambient-1.mp3',
+    '/audio/ambient-2.mp3',
+    '/audio/ambient-3.mp3'
+    // 继续往下加即可
+  ];
+  var CROSSFADE_SECONDS = 2.5;
+  var TARGET_VOLUME = 0.35;
+
+  var audios = [document.getElementById('bg-audio-1'), document.getElementById('bg-audio-2')];
+  var activeAudioIndex = 0;
+  var lastAudioTrack = null;
   var musicBtn = document.getElementById('musicBtn');
   var musicOn  = false;
-  var TARGET_VOLUME = 0.35;
+  var audioPrefetched = false;
+
+  function pickTrack(){
+    if (!AUDIO_TRACKS.length) return null;
+    if (AUDIO_TRACKS.length === 1) return AUDIO_TRACKS[0];
+    var idx;
+    do {
+      idx = Math.floor(Math.random() * AUDIO_TRACKS.length);
+    } while (AUDIO_TRACKS[idx] === lastAudioTrack);
+    lastAudioTrack = AUDIO_TRACKS[idx];
+    return AUDIO_TRACKS[idx];
+  }
 
   function fadeVolume(el, from, to, duration, done){
     var start = null;
@@ -885,35 +983,99 @@
     requestAnimationFrame(step);
   }
 
+  // 监听当前播放曲目的剩余时间，快放完时提前触发交叉切歌，避免留白静音
+  function watchForCrossfade(el){
+    function onTimeUpdate(){
+      if (!musicOn){ return; }
+      if (el.duration && (el.duration - el.currentTime) <= CROSSFADE_SECONDS){
+        el.removeEventListener('timeupdate', onTimeUpdate);
+        crossfadeToNextTrack();
+      }
+    }
+    el.addEventListener('timeupdate', onTimeUpdate);
+  }
+
+  function crossfadeToNextTrack(){
+    if (!musicOn) return;
+    var current    = audios[activeAudioIndex];
+    var nextIndex  = 1 - activeAudioIndex;
+    var next       = audios[nextIndex];
+    var track      = pickTrack();
+    if (!track) return;
+
+    next.src = track;
+    next.load();
+    next.addEventListener('canplay', function onReady(){
+      next.removeEventListener('canplay', onReady);
+      next.volume = 0;
+      var p = next.play();
+      if (p && p.catch){ p.catch(function(err){ console.warn('[高楼之巅] 背景音乐播放失败：', err); }); }
+      fadeVolume(next, 0, TARGET_VOLUME, CROSSFADE_SECONDS * 1000);
+      fadeVolume(current, current.volume, 0, CROSSFADE_SECONDS * 1000, function(){ current.pause(); });
+      activeAudioIndex = nextIndex;
+      watchForCrossfade(next);
+    }, { once:true });
+  }
+
+  // 浏览器空闲时预取曲库里剩下的曲目字节，第一次切歌时大概率已经在缓存里，不会有加载延迟
+  function prefetchRemainingTracks(){
+    if (audioPrefetched) return;
+    audioPrefetched = true;
+    AUDIO_TRACKS.forEach(function(src){
+      if (src === lastAudioTrack) return;
+      var link = document.createElement('link');
+      link.rel = 'prefetch';
+      link.as = 'audio';
+      link.href = src;
+      document.head.appendChild(link);
+    });
+  }
+
   musicBtn.addEventListener('click', function(){
     musicOn = !musicOn;
     musicBtn.classList.toggle('active', musicOn);
 
     if (musicOn){
-      bgAudio.volume = 0;
-      var playPromise = bgAudio.play();
-      if (playPromise && playPromise.catch){
-        playPromise.catch(function(err){
-          console.warn('[高楼之巅] 背景音乐播放被浏览器拦截或失败：', err);
-        });
+      var el = audios[activeAudioIndex];
+      var track = pickTrack();
+      if (!track) return;
+      el.src = track;
+      el.load();
+      el.addEventListener('canplay', function onReady(){
+        el.removeEventListener('canplay', onReady);
+        el.volume = 0;
+        var p = el.play();
+        if (p && p.catch){ p.catch(function(err){ console.warn('[高楼之巅] 背景音乐播放被浏览器拦截或失败：', err); }); }
+        fadeVolume(el, 0, TARGET_VOLUME, 1200);
+        watchForCrossfade(el);
+      }, { once:true });
+
+      // 用户主动开了音乐，说明确实需要，这时候再去预取曲库其余曲目最划算，
+      // 不打扰从没打开过音乐的访客的流量
+      if (window.requestIdleCallback){
+        requestIdleCallback(prefetchRemainingTracks);
+      } else {
+        setTimeout(prefetchRemainingTracks, 1500);
       }
-      fadeVolume(bgAudio, 0, TARGET_VOLUME, 1200);
     } else {
-      fadeVolume(bgAudio, bgAudio.volume, 0, 800, function(){
-        bgAudio.pause();
+      var current = audios[activeAudioIndex];
+      fadeVolume(current, current.volume, 0, 800, function(){
+        audios.forEach(function(a){ a.pause(); });
       });
     }
   });
 
-  bgAudio.addEventListener('error', function(){
-    console.error(
-      '[高楼之巅] 背景音乐加载失败：' + (bgAudio.currentSrc || bgAudio.src) +
-      '\n请确认音频文件已放进 public/audio/ 目录，且代码里的路径与真实文件名完全一致。'
-    );
+  audios.forEach(function(a){
+    a.addEventListener('error', function(){
+      console.error(
+        '[高楼之巅] 背景音乐加载失败：' + (a.currentSrc || a.src) +
+        '\n请确认音频文件已放进 public/audio/ 目录，且代码里 AUDIO_TRACKS 里的路径与真实文件名完全一致。'
+      );
+    });
   });
 
   // ============================================================
-  // 4. 冥想发呆 —— 时长选择气泡菜单 ｜ 支持我们 —— 赞助与好物气泡菜单
+  // 4. 云上发呆 —— 时长选择气泡菜单 ｜ 支持我们 —— 赞助气泡菜单
   //    两个气泡菜单共用同一套“互斥展开、点外部收起”的逻辑
   // ============================================================
   var meditateBtn   = document.getElementById('meditateBtn');
@@ -987,11 +1149,40 @@
   // ============================================================
   var meditationLayer = document.getElementById('meditationLayer');
   var breathText       = document.getElementById('breathText');
+  var breathBubble     = document.getElementById('breathBubble');
   var breathCountdown  = document.getElementById('breathCountdown');
+  var rateSlowerBtn    = document.getElementById('rateSlower');
+  var rateFasterBtn    = document.getElementById('rateFaster');
+  var rateValueLabel   = document.getElementById('rateValue');
 
   var countdownTimer  = null;
-  var breathTextTimer = null;
+  var breathPhaseTimer = null;
   var remainingSeconds = 0;
+
+  // 一次完整呼吸（吸气+呼气）的总时长，单位秒；吸气占 INHALE_RATIO，
+  // 呼气占剩下的部分——呼气比吸气长，是刻意的：更长的呼气对应更放松的
+  // 副交感神经反应，这也是"呼气...释怀..."想传达的感觉
+  var breathPeriod  = 8;
+  var INHALE_RATIO  = 0.42;
+  var MIN_PERIOD    = 5;
+  var MAX_PERIOD    = 14;
+
+  function bpmLabel(period){
+    return (60 / period).toFixed(1) + ' 次/分钟';
+  }
+
+  function applyBreathRate(){
+    rateValueLabel.textContent = bpmLabel(breathPeriod);
+    breathBubble.style.animationDuration = breathPeriod + 's';
+  }
+
+  // 让 CSS 里的 scale 动画从头重新开始播放，跟下面 JS 排的文字节奏对齐
+  function restartBubbleAnimation(){
+    breathBubble.style.animation = 'none';
+    void breathBubble.offsetWidth; // 强制重排，这一行不能删
+    breathBubble.style.animation = '';
+    applyBreathRate();
+  }
 
   function startMeditation(minutes){
     remainingSeconds = minutes * 60;
@@ -1006,7 +1197,8 @@
     // 5.2 短暂停顿后，呼吸气泡缓缓浮现，强化仪式感
     setTimeout(function(){
       meditationLayer.classList.add('active');
-      startBreathCycle();
+      restartBubbleAnimation();
+      scheduleBreathPhase(true);
     }, 650);
 
     countdownTimer = setInterval(function(){
@@ -1018,24 +1210,38 @@
     }, 1000);
   }
 
-  function startBreathCycle(){
-    var inhale = true;
-    breathText.textContent = '吸气...';
+  // 按吸气/呼气各自的时长递归排程，文字切换的时刻精确对应气泡放大到顶/缩回底的时刻，
+  // 而不是像固定 setInterval 那样跟动画各走各的
+  function scheduleBreathPhase(isInhale){
+    breathText.textContent = isInhale ? '吸气...' : (Math.random() > 0.5 ? '呼气...' : '释怀...');
     breathText.style.opacity = '1';
 
-    breathTextTimer = setInterval(function(){
-      inhale = !inhale;
+    var phaseMs = (isInhale ? INHALE_RATIO : (1 - INHALE_RATIO)) * breathPeriod * 1000;
+    var fadeLead = 300; // 提前 300ms 开始文字淡出，让切换看起来更顺滑，不生硬
+
+    breathPhaseTimer = setTimeout(function(){
       breathText.style.opacity = '0';
       setTimeout(function(){
-        if (inhale){
-          breathText.textContent = '吸气...';
-        } else {
-          breathText.textContent = Math.random() > 0.5 ? '呼气...' : '释怀...';
-        }
-        breathText.style.opacity = '1';
-      }, 300);
-    }, 4000);
+        scheduleBreathPhase(!isInhale);
+      }, fadeLead);
+    }, Math.max(300, phaseMs - fadeLead));
   }
+
+  function changeBreathRate(deltaSeconds){
+    breathPeriod = Math.min(MAX_PERIOD, Math.max(MIN_PERIOD, breathPeriod + deltaSeconds));
+    restartBubbleAnimation();
+    clearTimeout(breathPhaseTimer);
+    scheduleBreathPhase(true); // 从吸气重新起一轮，避免调整瞬间画面和文字对不上
+  }
+
+  rateSlowerBtn.addEventListener('click', function(e){
+    e.stopPropagation();
+    changeBreathRate(1); // 周期变长 = 呼吸变慢
+  });
+  rateFasterBtn.addEventListener('click', function(e){
+    e.stopPropagation();
+    changeBreathRate(-1); // 周期变短 = 呼吸变快
+  });
 
   function updateCountdownDisplay(){
     var m = Math.floor(remainingSeconds / 60);
@@ -1048,9 +1254,9 @@
   // ============================================================
   function endMeditation(){
     clearInterval(countdownTimer);
-    clearInterval(breathTextTimer);
+    clearTimeout(breathPhaseTimer);
     countdownTimer = null;
-    breathTextTimer = null;
+    breathPhaseTimer = null;
 
     meditationLayer.classList.remove('active');
 
