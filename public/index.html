@@ -35,23 +35,36 @@
      会把视频框撑得远大于视口，叠加 object-fit:cover 后只截取到其中一角，
      这正是“视频显示不全、只看到一个角落”的根因，现已彻底改用更稳健的写法） */
 
-  .bg-video{
+  /* ============ 背景层：常驻图 + 按需视频 ============ */
+  /* 满铺裁切方案：直接把元素框定为 100vw × 100vh，再用 object-fit: cover 裁切，
+     不管素材原始分辨率或宽高比是多少都能正确居中裁切满屏。
+     （注：之前用的是 min-width/min-height:100% + width/height:auto 的老技巧，
+     这套写法在源素材宽高比与屏幕差异较大、尤其是高分辨率素材时，
+     会把框撑得远大于视口，叠加 object-fit:cover 后只截取到其中一角，
+     这正是“画面显示不全、只看到一个角落”的根因，现已彻底改用更稳健的写法） */
+
+  .bg-layer{
     position:fixed;
     top:0;
     left:0;
     width:100vw;
     height:100vh;
     object-fit:cover;
-    z-index:0;
-    pointer-events:none;      /* 关键防干扰：彻底禁止对背景视频的任何点击/长按交互 */
+    pointer-events:none;      /* 关键防干扰：彻底禁止对背景的任何点击/长按交互 */
     user-select:none;
-    opacity:0;
-    transition: opacity 1.2s ease;
     background:#000;
   }
 
-  /* 双 video 叠层，用于无闪烁的平滑交叉淡入淡出切换 */
-  .bg-video.active{
+  #bg-image{
+    z-index:0;    /* 图片永远在最底层、永远可见，负责“进站瞬间不卡顿”和视频加载期间兜底 */
+  }
+
+  #bg-video{
+    z-index:1;    /* 叠在图片上方，只有加载好、淡入之后才会盖住图片 */
+    opacity:0;
+    transition: opacity 1.2s ease;
+  }
+  #bg-video.active{
     opacity:1;
   }
 
@@ -582,18 +595,19 @@
   /* 无障碍：尊重系统的“减少动态效果”偏好 */
   @media (prefers-reduced-motion: reduce){
     .ui-fade{ transition-duration: 0.2s !important; }
-    .bg-video{ transition-duration: 0.2s !important; }
+    #bg-video{ transition-duration: 0.2s !important; }
     .breath-bubble{ animation-duration: 12s; }
   }
 </style>
 </head>
 <body>
 
-  <!-- ============ 原生 HTML5 视频背景（已彻底移除 iframe，无第三方广告/跳转）============ -->
-  <!-- poster 建议填一张与视频首帧接近的静态图（JPG，几十 KB 即可），
-       浏览器会在视频真正解码出画面之前先瞬时显示这张图，切换观感会快很多 -->
-  <video id="bg-video-1" class="bg-video" autoplay loop muted playsinline preload="auto"></video>
-  <video id="bg-video-2" class="bg-video" autoplay loop muted playsinline preload="auto"></video>
+  <!-- ============ 背景层：一张常驻的图 + 一个按需加载的视频 ============ -->
+  <!-- bg-image 永远在最底层、永远可见——进站瞬间就能看到画面，不等任何视频；
+       bg-video 叠在上面，只有用户点了某个分类之后才会真正开始加载和播放，
+       加载好之前，下面的图（已经先一步换成目标场景的封面）负责兜底，不会有黑屏 -->
+  <img id="bg-image" class="bg-layer" alt="">
+  <video id="bg-video" class="bg-layer" autoplay loop muted playsinline></video>
 
   <!-- ============ 背景音乐（默认不自动播放，需用户手动点开）============ -->
   <!-- 两个 <audio> 交替使用，实现无缝交叉淡入淡出切歌，用法和背景视频完全对称 -->
@@ -721,76 +735,19 @@
 (function(){
 
   // ============================================================
-  // 1. 场景配置 —— 每个场景可以挂任意数量的视频，素材库大小完全灵活，
-  //    往数组里加/删链接即可，不用碰下面的任何逻辑代码。
-  //    每次切换到某个场景时会从对应数组里随机抽一条播放，
-  //    且会避开"刚刚放过的那一条"，让老用户多次访问也不容易看腻。
+  // 1. 场景配置 —— 每个场景可以挂若干条视频。
+  //    第一次点某个分类按钮，显示这个分类的第 1 条；
+  //    再点同一个按钮，换成第 2 条，依次循环——
+  //    比如“魔幻重庆”连点两次，就是“重庆一 → 重庆二”。
+  //    素材库大小完全灵活，往数组里加/删链接即可，不用碰下面的逻辑代码
   // ============================================================
   var SCENES = {
-    chongqing: {
-      name:'魔幻重庆',
-      videos:[
-        '/videos/chongqing-1.mp4',
-        '/videos/chongqing-2.mp4'
-        // 想恢复更多条目，往下加就行；但条目越多，第一次点到的组合越多，
-        // 切换体感就会越慢——这是物理限制，不是代码能解决的，2 条是目前
-        // “有点变化 + 基本不用等”比较平衡的数量
-      ]
-    },
-    shanghai: {
-      name:'都市上海',
-      videos:[
-        '/videos/shanghai-1.mp4',
-        '/videos/shanghai-2.mp4'
-      ]
-    },
-    snowmountain: {
-      name:'治愈雪山',
-      videos:[
-        '/videos/snowmountain-1.mp4',
-        '/videos/snowmountain-2.mp4'
-      ]
-    },
-    cyberpunk: {
-      name:'虚拟夜之城',
-      videos:[
-        '/videos/cyberpunk-1.mp4',
-        '/videos/cyberpunk-2.mp4'
-      ]
-    }
+    chongqing:    { name:'魔幻重庆',   videos:['/videos/chongqing-1.mp4', '/videos/chongqing-2.mp4'] },
+    shanghai:     { name:'都市上海',   videos:['/videos/shanghai-1.mp4', '/videos/shanghai-2.mp4'] },
+    snowmountain: { name:'治愈雪山',   videos:['/videos/snowmountain-1.mp4', '/videos/snowmountain-2.mp4'] },
+    cyberpunk:    { name:'虚拟夜之城', videos:['/videos/cyberpunk-1.mp4', '/videos/cyberpunk-2.mp4'] }
   };
-
   var SCENE_KEYS = Object.keys(SCENES);
-  // 每次打开网站，起始场景也随机挑一个分类，配合场景内随机选片，
-  // 让"多次登录不觉得单调"从进站第一眼就成立
-  var DEFAULT_SCENE = SCENE_KEYS[Math.floor(Math.random() * SCENE_KEYS.length)];
-
-  // 记住每个场景上一次放过的是哪一条，抽取时尽量避开，减少"刚看过又是它"的重复感
-  var lastPlayedIndex = {};
-
-  // 数组里每一项既可以是纯字符串（只有视频地址），
-  // 也可以写成 { src:'...mp4', poster:'...jpg' } 手动指定一张海报图；
-  // 但更省心的是下面的“同名约定”：只要在视频同一目录放一张文件名相同、
-  // 后缀是 .jpg 的图（比如 chongqing-1.mp4 配 chongqing-1.jpg），
-  // 代码会自动探测到并优先使用，完全不用在这里手动写 poster 字段
-  function normalizeEntry(entry){
-    if (!entry) return null;
-    if (typeof entry === 'string') return { src: entry, poster: '', srcLow: '' };
-    return { src: entry.src, poster: entry.poster || '', srcLow: entry.srcLow || '' };
-  }
-
-  // 弱网自动降级（可选功能）：某个视频条目如果额外写了 srcLow 字段
-  // （比如同一段素材导出的一个低码率/低分辨率版本），在检测到用户是
-  // 慢网络（2g/3g）或开了"数据节省模式”时，会自动改用这个轻量版本。
-  // 没有配置 srcLow 的条目完全不受影响，照常播放原来的 src
-  function pickBestSrc(entry){
-    var conn = navigator.connection || navigator.webkitConnection || navigator.mozConnection;
-    if (entry.srcLow && conn){
-      var isSlow = conn.saveData || (conn.effectiveType && /2g|3g/.test(conn.effectiveType));
-      if (isSlow) return entry.srcLow;
-    }
-    return entry.src;
-  }
 
   // 按“同名约定”推导海报图路径：/videos/chongqing-1.mp4 → /videos/chongqing-1.jpg
   function derivePosterPath(src){
@@ -799,178 +756,103 @@
   }
 
   // 全部分类、全部视频的海报图，页面一打开就立刻全量预加载——
-  // 海报图体积极小（几十 KB 一张），就算全部一起下载也几乎不会跟
-  // 正在播放的视频抢带宽，性价比最高，所以不用像视频那样错峰延迟，
-  // 直接抢在最前面做。效果是：不管用户先点哪个按钮、哪怕是第一次点，
-  // 封面图都已经在缓存里了，一点开就是秒开
+  // 海报图体积极小（几十 KB 一张），这一步做完之后，不管用户先点哪个按钮，
+  // 背景图都是秒切；真正的视频文件完全不预加载，只有点了才会去请求
   function preloadAllPosters(){
     SCENE_KEYS.forEach(function(key){
       var list = SCENES[key] && SCENES[key].videos;
       if (!list) return;
-      list.forEach(function(entry){
-        var norm = normalizeEntry(entry);
-        var posterPath = norm.poster || derivePosterPath(norm.src);
+      list.forEach(function(src){
+        var posterPath = derivePosterPath(src);
         if (!posterPath) return;
         var img = new Image();
-        img.src = posterPath; // 加载失败也静默无害，真正用到时会自动退回安全模式
+        img.src = posterPath; // 加载失败也静默无害
       });
     });
   }
   preloadAllPosters();
 
-  function pickVideoSrc(key){
-    var list = SCENES[key] && SCENES[key].videos;
-    if (!list || !list.length) return null;
-    if (list.length === 1) return normalizeEntry(list[0]);
-
-    var idx;
-    do {
-      idx = Math.floor(Math.random() * list.length);
-    } while (idx === lastPlayedIndex[key]);
-
-    lastPlayedIndex[key] = idx;
-    return normalizeEntry(list[idx]);
-  }
-
-  var videos = [document.getElementById('bg-video-1'), document.getElementById('bg-video-2')];
-  var activeIndex = 0;
-  // 每次调用 switchScene 都会递增这个值，异步回调触发时会核对自己那一代
-  // 是不是还是“最新的一次切换”——如果切换过程中用户又点了别的按钮，
-  // 老的那次异步回调会识别出自己已经过期，直接放弃、不再生效。
-  // 这就避免了“快速连续点击时，两次切换抢用同一个 video 元素、
-  // 谁先谁后全看运气”的竞态问题（这也是切换速度“时快时慢”的常见成因之一）
-  var switchGeneration = 0;
+  var bgImage = document.getElementById('bg-image');
+  var bgVideo = document.getElementById('bg-video');
   var sceneButtons = document.querySelectorAll('.scene-btn[data-scene]');
 
-  // 若视频源被防盗链拦截、404 或格式不支持，会在控制台给出明确诊断信息，
-  // 而不是让页面无声无息地停留在纯黑背景上
-  videos.forEach(function(v){
-    v.addEventListener('error', function(){
-      console.error(
-        '[高楼之巅] 背景视频加载失败：' + (v.currentSrc || v.src) +
-        '\n常见原因：1) 视频源开启了防盗链（Referer 校验），需自建托管；' +
-        '2) 链接失效或跨域被拒绝；3) 网络无法访问该域名。'
-      );
-    });
+  var currentSceneKey = null;
+  var currentVideoIndex = {}; // 记住每个分类目前放到第几条了，方便“再点一次换下一条”
+  var switchGeneration = 0;   // 防止快速连点时，旧的一次切换在新的一次之后才完成而覆盖画面
+
+  bgVideo.addEventListener('error', function(){
+    console.error(
+      '[高楼之巅] 背景视频加载失败：' + (bgVideo.currentSrc || bgVideo.src) +
+      '\n常见原因：1) 视频源开启了防盗链（Referer 校验），需自建托管；' +
+      '2) 链接失效或跨域被拒绝；3) 网络无法访问该域名。'
+    );
   });
 
   // ============================================================
-  // 2. 平滑无闪烁切换：双 <video> 交叉淡入淡出
-  //    有海报图时立即显示（海报秒开，真实画面解码好后无缝替换）；
-  //    没有海报图时退回“等 loadeddata/canplay 就绪再显示”的安全策略，
-  //    两种情况都绝不会露出黑屏或闪烁
+  // 2. 点击才加载：图片先秒切到位，视频这时候才真正开始请求，
+  //    加载好之前，下面的图片全程兜底，不会有黑屏或闪烁
   // ============================================================
-  function switchScene(key){
-    var scene = SCENES[key];
-    if (!scene) return;
+  function selectScene(key){
+    var list = SCENES[key] && SCENES[key].videos;
+    if (!list || !list.length) return;
 
-    var picked = pickVideoSrc(key);
-    if (!picked) return;
-    var actualSrc = pickBestSrc(picked); // 可能因为弱网降级成 srcLow
-
-    var myGeneration = ++switchGeneration; // 标记这是第几次切换，异步回调靠这个判断自己是否已过期
-
-    var activeVideo = videos[activeIndex];
-    var nextIndex   = 1 - activeIndex;
-    var nextVideo   = videos[nextIndex];
-    var triggered   = false;
-    var fallbackTimer = null;
-
-    function reveal(){
-      if (myGeneration !== switchGeneration) return; // 已经被更新的一次切换取代，放弃
-
-      var playPromise = nextVideo.play();
-      if (playPromise && playPromise.catch){
-        playPromise.catch(function(err){
-          console.warn('[高楼之巅] 视频播放被浏览器拦截或失败：', err, nextVideo.currentSrc);
-        });
-      }
-
-      nextVideo.classList.add('active');
-      activeVideo.classList.remove('active');
-      activeIndex = nextIndex;
-
-      // 等旧视频完全淡出（与 CSS 的 1.2s 过渡时间对应）后再暂停，节省性能
-      setTimeout(function(){
-        activeVideo.pause();
-      }, 1300);
-    }
-
-    function onReady(){
-      if (triggered) return;
-      triggered = true;
-      nextVideo.removeEventListener('loadeddata', onReady);
-      nextVideo.removeEventListener('canplay', onReady);
-      clearTimeout(fallbackTimer);
-      reveal();
-    }
-
-    function gatedReveal(){
-      // 双重监听：loadeddata（首帧可用）和 canplay（可流畅播放）任一先触发即可，
-      // 避免某些浏览器/编码组合下 canplay 迟迟不触发导致画面卡在黑屏
-      nextVideo.addEventListener('loadeddata', onReady);
-      nextVideo.addEventListener('canplay', onReady);
-
-      // 3 秒硬性兜底：即使两个事件都没等到，也强制显示，避免无限期黑屏
-      fallbackTimer = setTimeout(function(){
-        if (myGeneration !== switchGeneration) return;
-        if (!triggered){
-          console.warn('[高楼之巅] 视频 3 秒内未触发 loadeddata/canplay，已强制显示：', actualSrc);
-        }
-        onReady();
-      }, 3000);
-    }
-
-    nextVideo.src = actualSrc;
-    nextVideo.load();
-
-    // 自动探测同名海报图：手动指定的 poster 优先，否则按“同名约定”推导，
-    // 探测图片能加载出来才会“秒开”，加载失败就静默退回安全的等待模式，
-    // 不会因为没有海报图而黑屏或报错
-    var posterPath = picked.poster || derivePosterPath(picked.src);
-    if (posterPath){
-      var probe = new Image();
-      probe.onload = function(){
-        if (myGeneration !== switchGeneration) return;
-        if (triggered) return;
-        triggered = true;
-        clearTimeout(fallbackTimer);
-        nextVideo.poster = posterPath;
-        reveal();
-      };
-      probe.onerror = function(){
-        if (myGeneration !== switchGeneration) return;
-        console.warn('[高楼之巅] 海报图未找到或加载失败，已退回等待视频就绪的模式：', posterPath);
-        nextVideo.removeAttribute('poster');
-        gatedReveal();
-      };
-      probe.src = posterPath;
+    var idx;
+    if (key === currentSceneKey && list.length > 1){
+      idx = ((currentVideoIndex[key] || 0) + 1) % list.length; // 同一个分类再点一次，换下一条
     } else {
-      gatedReveal();
+      idx = currentVideoIndex[key] || 0;
     }
+    currentVideoIndex[key] = idx;
+    currentSceneKey = key;
+
+    var src = list[idx];
+    var posterPath = derivePosterPath(src);
+    var myGeneration = ++switchGeneration;
+
+    if (posterPath){
+      bgImage.src = posterPath; // 已经预加载过，这一步几乎瞬时
+    }
+
+    bgVideo.classList.remove('active'); // 先淡出旧视频，露出下面已经换好的图
+
+    setTimeout(function(){
+      if (myGeneration !== switchGeneration) return; // 切换过程中又点了别的，放弃这一次
+
+      bgVideo.src = src;
+      bgVideo.load();
+
+      function onReady(){
+        bgVideo.removeEventListener('canplay', onReady);
+        if (myGeneration !== switchGeneration) return;
+        var p = bgVideo.play();
+        if (p && p.catch){ p.catch(function(err){ console.warn('[高楼之巅] 视频播放被浏览器拦截或失败：', err); }); }
+        bgVideo.classList.add('active');
+      }
+      bgVideo.addEventListener('canplay', onReady);
+    }, 300); // 给旧视频的淡出动画留一点时间，避免瞬间跳变
 
     sceneButtons.forEach(function(btn){
       btn.classList.toggle('active', btn.dataset.scene === key);
     });
   }
 
-  // ============================================================
-  // 注：这里曾经有一套“预取策略”（提前在后台加载其余场景的视频），
-  // 但实测发现它会把浏览器的并发连接占满，导致真正需要的请求
-  // （包括切换时要用的视频、甚至几十 KB 的封面图）被挤在队列里，
-  // 有些甚至被服务器直接断开连接（net::ERR_CONNECTION_CLOSED）——
-  // 好心办了坏事，所以整段拿掉了。现在的策略更朴素：
-  // 视频本身做好压缩/剪短/faststart，配合 vercel.json 的长期缓存
-  // 和封面图秒开，不再用 JS 去猜"该预取哪个、什么时候预取"。
-  // ============================================================
-
   sceneButtons.forEach(function(btn){
     btn.addEventListener('click', function(){
-      switchScene(btn.dataset.scene);
+      selectScene(btn.dataset.scene);
     });
   });
 
-  switchScene(DEFAULT_SCENE);
+  // 进站默认展示一个随机分类的封面图（不加载视频，视频等用户点了才开始）
+  (function showDefaultPoster(){
+    var defaultKey = SCENE_KEYS[Math.floor(Math.random() * SCENE_KEYS.length)];
+    var firstSrc = SCENES[defaultKey].videos[0];
+    var posterPath = derivePosterPath(firstSrc);
+    if (posterPath) bgImage.src = posterPath;
+    sceneButtons.forEach(function(btn){
+      btn.classList.toggle('active', btn.dataset.scene === defaultKey);
+    });
+    currentSceneKey = null; // 还没真正“选中”任何分类的视频，保留 null，方便第一次点击时从第 1 条开始
+  })();
 
   // ============================================================
   // 3. 智能隐形逻辑（鼠标静止 3 秒自动隐藏）
