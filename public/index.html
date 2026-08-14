@@ -164,6 +164,30 @@
     color:rgba(255,255,255,0.6);
   }
 
+  /* ============ 右上角：地标小注 ============ */
+  /* 切换场景时短暂浮现，几秒后自动隐去——不挂在 .ui-fade 上，
+     是因为它有自己的、比鼠标静止隐形更短的独立节奏 */
+
+  .landmark-caption{
+    position:fixed;
+    top:5.5vh;
+    right:5.5vw;
+    z-index:11;
+    font-weight:300;
+    font-size:0.72rem;
+    letter-spacing:0.14em;
+    color:rgba(255,255,255,0.55);
+    text-align:right;
+    text-shadow: 0 1px 10px rgba(0,0,0,0.35);
+    opacity:0;
+    pointer-events:none;
+    transition: opacity 1.2s ease;
+    max-width:40vw;
+  }
+  .landmark-caption.show{
+    opacity:1;
+  }
+
   /* ============ 下方正中：毛玻璃控制面板 ============ */
 
   .control-panel{
@@ -579,12 +603,35 @@
     white-space:nowrap;
   }
 
+  /* ============ 冥想开场：找个坐直的姿势 ============ */
+
+  .meditation-cue{
+    position:fixed;
+    top:50%;
+    left:50%;
+    transform:translate(-50%, -50%);
+    z-index:21;
+    font-weight:300;
+    font-size:0.9rem;
+    letter-spacing:0.16em;
+    color:rgba(255,255,255,0.75);
+    text-align:center;
+    white-space:nowrap;
+    opacity:0;
+    pointer-events:none;
+    transition: opacity 1s ease;
+  }
+  .meditation-cue.show{
+    opacity:1;
+  }
+
   /* ============ 移动端适配 ============ */
 
   @media (max-width: 640px){
     .brand{ top:6.5vh; left:6vw; }
     .brand__title{ font-size:1.05rem; }
     .brand__subtitle{ font-size:0.78rem; }
+    .landmark-caption{ top:6.5vh; right:6vw; font-size:0.66rem; max-width:48vw; }
     .control-panel{ bottom:5vh; padding:8px 10px; gap:2px; }
     .scene-btn{ width:38px; height:38px; }
     .scene-btn__label{ display:none; } /* 触屏无 hover，隐藏文字气泡 */
@@ -626,6 +673,9 @@
       <span class="brand__divider"></span>
       <div class="brand__subtitle">登高，望远，然后释怀。</div>
     </div>
+
+    <!-- 右上角地标小注：切换场景时短暂浮现，几秒后自动隐去，不受鼠标静止隐形逻辑控制 -->
+    <div class="landmark-caption" id="landmarkCaption"></div>
 
     <!-- 下方毛玻璃控制面板 -->
     <div class="control-panel ui-fade" role="group" aria-label="切换风景与冥想">
@@ -709,6 +759,10 @@
     <button class="time-picker__start" id="startMeditation">开始</button>
   </div>
 
+  <!-- 冥想开始瞬间，先浮现一句身体姿势的提示，隐去之后气泡才出现——
+       把“登高”落到身体感受上，而不是做成打卡/连续天数这类游戏化的东西 -->
+  <div class="meditation-cue" id="meditationCue">找一个能坐直的姿势</div>
+
   <!-- ============ 中央呼吸冥想层 ============ -->
   <div class="meditation-layer" id="meditationLayer" aria-hidden="true">
     <div class="breath-bubble" id="breathBubble">
@@ -742,10 +796,26 @@
   //    素材库大小完全灵活，往数组里加/删链接即可，不用碰下面的逻辑代码
   // ============================================================
   var SCENES = {
-    chongqing:    { name:'魔幻重庆',   videos:['/videos/chongqing-1.mp4', '/videos/chongqing-2.mp4'] },
-    shanghai:     { name:'都市上海',   videos:['/videos/shanghai-1.mp4', '/videos/shanghai-2.mp4'] },
-    snowmountain: { name:'治愈雪山',   videos:['/videos/snowmountain-1.mp4', '/videos/snowmountain-2.mp4'] },
-    cyberpunk:    { name:'虚拟夜之城', videos:['/videos/cyberpunk-1.mp4', '/videos/cyberpunk-2.mp4'] }
+    chongqing:    {
+      name:'魔幻重庆',
+      landmark:'重庆来福士 · 350米', // 切到这个分类时短暂浮现的小注，留空字符串则不显示
+      videos:['/videos/chongqing-1.mp4', '/videos/chongqing-2.mp4', '/videos/chongqing-3.mp4', '/videos/chongqing-4.mp4']
+    },
+    shanghai: {
+      name:'都市上海',
+      landmark:'上海中心大厦 · 632米',
+      videos:['/videos/shanghai-1.mp4', '/videos/shanghai-2.mp4', '/videos/shanghai-3.mp4', '/videos/shanghai-4.mp4']
+    },
+    snowmountain: {
+      name:'治愈雪山',
+      landmark:'', // 没有具体地标，留空；如果素材是某座真实山峰，可以填“XX峰 · XXXX米”
+      videos:['/videos/snowmountain-1.mp4', '/videos/snowmountain-2.mp4', '/videos/snowmountain-3.mp4', '/videos/snowmountain-4.mp4']
+    },
+    cyberpunk: {
+      name:'虚拟夜之城',
+      landmark:'', // 虚构场景，同上，可以按自己的设定填一句氛围文字
+      videos:['/videos/cyberpunk-1.mp4', '/videos/cyberpunk-2.mp4', '/videos/cyberpunk-3.mp4', '/videos/cyberpunk-4.mp4']
+    }
   };
   var SCENE_KEYS = Object.keys(SCENES);
 
@@ -775,10 +845,25 @@
   var bgImage = document.getElementById('bg-image');
   var bgVideo = document.getElementById('bg-video');
   var sceneButtons = document.querySelectorAll('.scene-btn[data-scene]');
+  var landmarkCaption = document.getElementById('landmarkCaption');
 
   var currentSceneKey = null;
   var currentVideoIndex = {}; // 记住每个分类目前放到第几条了，方便“再点一次换下一条”
   var switchGeneration = 0;   // 防止快速连点时，旧的一次切换在新的一次之后才完成而覆盖画面
+  var landmarkTimer = null;
+
+  function showLandmarkCaption(text){
+    clearTimeout(landmarkTimer);
+    if (!text){
+      landmarkCaption.classList.remove('show');
+      return;
+    }
+    landmarkCaption.textContent = text;
+    landmarkCaption.classList.add('show');
+    landmarkTimer = setTimeout(function(){
+      landmarkCaption.classList.remove('show');
+    }, 3500);
+  }
 
   bgVideo.addEventListener('error', function(){
     console.error(
@@ -812,6 +897,8 @@
     if (posterPath){
       bgImage.src = posterPath; // 已经预加载过，这一步几乎瞬时
     }
+
+    showLandmarkCaption(SCENES[key].landmark);
 
     bgVideo.classList.remove('active'); // 先淡出旧视频，露出下面已经换好的图
 
@@ -1072,6 +1159,7 @@
   // 5. 进入冥想（开启精神留白）—— 呼吸引导气泡
   // ============================================================
   var meditationLayer = document.getElementById('meditationLayer');
+  var meditationCue    = document.getElementById('meditationCue');
   var breathText       = document.getElementById('breathText');
   var breathBubble     = document.getElementById('breathBubble');
   var breathCountdown  = document.getElementById('breathCountdown');
@@ -1152,12 +1240,26 @@
     document.body.classList.remove('ui-visible');
     clearTimeout(hideTimer);
 
-    // 5.2 短暂停顿后，呼吸气泡缓缓浮现，强化仪式感
+    // 5.2 主界面淡出得差不多时，先单独浮现一句身体姿势的提示——
+    //     把“登高”落到身体感受上，而不是打卡天数这类游戏化的东西
+    var CUE_APPEAR_AT   = 650;
+    var CUE_HOLD_MS     = 1800;
+    var CUE_FADE_OUT_MS = 900;
+
+    setTimeout(function(){
+      meditationCue.classList.add('show');
+    }, CUE_APPEAR_AT);
+
+    setTimeout(function(){
+      meditationCue.classList.remove('show');
+    }, CUE_APPEAR_AT + CUE_HOLD_MS);
+
+    // 5.3 姿势提示完全隐去之后，呼吸气泡才浮现，强化仪式感、避免两者叠在一起
     setTimeout(function(){
       meditationLayer.classList.add('active');
       restartBubbleAnimation();
       scheduleBreathPhase(true);
-    }, 650);
+    }, CUE_APPEAR_AT + CUE_HOLD_MS + CUE_FADE_OUT_MS);
 
     countdownTimer = setInterval(function(){
       remainingSeconds--;
@@ -1217,6 +1319,7 @@
   function exitMeditation(){
     meditationLayer.classList.remove('active');
     meditationLayer.classList.remove('finale');
+    meditationCue.classList.remove('show');
     resetBubbleFlourish();
 
     setTimeout(function(){
