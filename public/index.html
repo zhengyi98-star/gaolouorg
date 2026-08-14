@@ -516,6 +516,44 @@
     text-align:center;
   }
 
+  /* ============ 破云见日 · 诗句 ============ */
+  /* 倒计时自然结束时：气泡本体、倒计时、调速控件一起淡出，
+     诗句在原来的位置浮现，停留片刻后随一切一起消失 */
+
+  .meditation-layer.finale .breath-bubble,
+  .meditation-layer.finale .breath-countdown,
+  .meditation-layer.finale .breath-rate{
+    opacity:0;
+    transition: opacity 1s ease;
+  }
+
+  .breath-poem{
+    opacity:0;
+    pointer-events:none;
+    transition: opacity 1.6s var(--ease-slow);
+    text-align:center;
+    max-width:78vw;
+  }
+  .meditation-layer.finale .breath-poem{
+    opacity:1;
+  }
+
+  .breath-poem__line{
+    font-weight:300;
+    font-size:1.05rem;
+    letter-spacing:0.14em;
+    line-height:2;
+    color:rgba(255,255,255,0.92);
+    text-shadow: 0 1px 16px rgba(0,0,0,0.4);
+  }
+
+  .breath-poem__author{
+    margin-top:12px;
+    font-size:0.66rem;
+    letter-spacing:0.22em;
+    color:rgba(255,255,255,0.42);
+  }
+
   .breath-hint{
     position:fixed;
     bottom:4.5vh;
@@ -670,6 +708,12 @@
       <button class="breath-rate__btn" id="rateFaster" aria-label="呼吸快一点">&plus;</button>
     </div>
 
+    <!-- 倒计时自然结束时，破云见日之后浮现的一句诗，停留片刻后随一切一起淡出 -->
+    <div class="breath-poem" id="breathPoem">
+      <div class="breath-poem__line" id="poemLine"></div>
+      <div class="breath-poem__author" id="poemAuthor"></div>
+    </div>
+
     <div class="breath-hint">按 Esc 或双击屏幕，随时回到高楼之巅</div>
   </div>
 
@@ -687,33 +731,31 @@
       name:'魔幻重庆',
       videos:[
         '/videos/chongqing-1.mp4',
-        '/videos/chongqing-2.mp4',
-        '/videos/chongqing-3.mp4'
-        // 继续往下加即可，如 '/videos/chongqing-4.mp4', ...
+        '/videos/chongqing-2.mp4'
+        // 想恢复更多条目，往下加就行；但条目越多，第一次点到的组合越多，
+        // 切换体感就会越慢——这是物理限制，不是代码能解决的，2 条是目前
+        // “有点变化 + 基本不用等”比较平衡的数量
       ]
     },
     shanghai: {
       name:'都市上海',
       videos:[
         '/videos/shanghai-1.mp4',
-        '/videos/shanghai-2.mp4',
-        '/videos/shanghai-3.mp4'
+        '/videos/shanghai-2.mp4'
       ]
     },
     snowmountain: {
       name:'治愈雪山',
       videos:[
         '/videos/snowmountain-1.mp4',
-        '/videos/snowmountain-2.mp4',
-        '/videos/snowmountain-3.mp4'
+        '/videos/snowmountain-2.mp4'
       ]
     },
     cyberpunk: {
       name:'虚拟夜之城',
       videos:[
         '/videos/cyberpunk-1.mp4',
-        '/videos/cyberpunk-2.mp4',
-        '/videos/cyberpunk-3.mp4'
+        '/videos/cyberpunk-2.mp4'
       ]
     }
   };
@@ -913,82 +955,22 @@
   }
 
   // ============================================================
-  // 预取策略（分两档，随着素材库变大而调整）：
-  // 1）当前正在播放的分类：把它剩下的全部视频都预取一遍——
-  //    同一个按钮反复点击命中缓存的概率最高，值得覆盖全部
-  // 2）其余分类：只预取“第一条”，给个头，真正点进去才会补齐剩下的
-  // 每个分类只会被“全量预取”一次，不会重复占用带宽
-  //
-  // 关键点：预取绝不能跟“用户正在等着看的这个视频”抢带宽。
-  // requestIdleCallback 判断的是“主线程”是否空闲，跟“网络”是否空闲是两回事——
-  // JS 跑完几乎立刻主线程就空闲了，但这时候当前视频可能还在缓冲，
-  // 用 idle callback 反而会让预取紧贴着当前视频一起抢带宽，越预取越卡。
-  // 所以这里改成：固定延迟几秒 + 每条之间再错开时间 + 标记低优先级，
-  // 三重保证当前正在播的视频永远优先吃到带宽
+  // 注：这里曾经有一套“预取策略”（提前在后台加载其余场景的视频），
+  // 但实测发现它会把浏览器的并发连接占满，导致真正需要的请求
+  // （包括切换时要用的视频、甚至几十 KB 的封面图）被挤在队列里，
+  // 有些甚至被服务器直接断开连接（net::ERR_CONNECTION_CLOSED）——
+  // 好心办了坏事，所以整段拿掉了。现在的策略更朴素：
+  // 视频本身做好压缩/剪短/faststart，配合 vercel.json 的长期缓存
+  // 和封面图秒开，不再用 JS 去猜"该预取哪个、什么时候预取"。
   // ============================================================
-  var fullyPrefetchedCategories = {};
-  var PREFETCH_START_DELAY = 5000;   // 页面/切换后先等 5 秒，把带宽让给当前视频
-  var PREFETCH_STAGGER     = 1500;   // 之后每一条预取请求之间再错开的间隔
-
-  function prefetchVideo(src, delay){
-    setTimeout(function(){
-      var link = document.createElement('link');
-      link.rel = 'prefetch';
-      link.as = 'video';
-      link.href = src;
-      // 低优先级提示：明确告诉浏览器这些请求不急，谁都能插队（不支持的浏览器会忽略，无副作用）
-      try { link.fetchPriority = 'low'; } catch(e){}
-      document.head.appendChild(link);
-    }, delay);
-  }
-
-  // 三级优先队列，对应真实的浏览行为：
-  // 第一梯队 —— 其余分类各一条：大多数人进站会把 4 个按钮先点一遍看看有什么，
-  //             这个需求最紧迫，排最前面
-  // 第二梯队 —— 当前分类的其余几条：用户正在这个分类里，继续深挖它的优先级其次
-  // 第三梯队 —— 其余分类剩下的几条：最边缘的需求，排最后
-  function buildPrefetchQueue(key){
-    var currentList = (SCENES[key] && SCENES[key].videos) || [];
-    var currentSrcs = currentList.map(function(entry){ return normalizeEntry(entry).src; });
-    // 当前正在播放的那一条已经在加载了，深度预取从第 2 条开始即可，不用重复排队
-    var currentRestSrcs = fullyPrefetchedCategories[key] ? [] : currentSrcs.slice(1);
-    fullyPrefetchedCategories[key] = true;
-
-    var otherLists = SCENE_KEYS
-      .filter(function(k){ return k !== key; })
-      .map(function(k){
-        var list = SCENES[k] && SCENES[k].videos;
-        return (list || []).map(function(entry){ return normalizeEntry(entry).src; });
-      });
-
-    var otherFirstSrcs = otherLists.map(function(list){ return list[0]; }).filter(Boolean);
-
-    var otherRestSrcs = [];
-    otherLists.forEach(function(list){
-      otherRestSrcs = otherRestSrcs.concat(list.slice(1));
-    });
-
-    return otherFirstSrcs.concat(currentRestSrcs).concat(otherRestSrcs);
-  }
-
-  function schedulePrefetch(key){
-    setTimeout(function(){
-      var queue = buildPrefetchQueue(key);
-      queue.forEach(function(src, i){
-        prefetchVideo(src, i * PREFETCH_STAGGER);
-      });
-    }, PREFETCH_START_DELAY);
-  }
 
   sceneButtons.forEach(function(btn){
     btn.addEventListener('click', function(){
       switchScene(btn.dataset.scene);
-      schedulePrefetch(btn.dataset.scene);
     });
   });
 
   switchScene(DEFAULT_SCENE);
-  schedulePrefetch(DEFAULT_SCENE);
 
   // ============================================================
   // 3. 智能隐形逻辑（鼠标静止 3 秒自动隐藏）
@@ -1035,7 +1017,6 @@
   var lastAudioTrack = null;
   var musicBtn = document.getElementById('musicBtn');
   var musicOn  = false;
-  var audioPrefetched = false;
 
   function pickTrack(){
     if (!AUDIO_TRACKS.length) return null;
@@ -1097,20 +1078,6 @@
     }, { once:true });
   }
 
-  // 浏览器空闲时预取曲库里剩下的曲目字节，第一次切歌时大概率已经在缓存里，不会有加载延迟
-  function prefetchRemainingTracks(){
-    if (audioPrefetched) return;
-    audioPrefetched = true;
-    AUDIO_TRACKS.forEach(function(src){
-      if (src === lastAudioTrack) return;
-      var link = document.createElement('link');
-      link.rel = 'prefetch';
-      link.as = 'audio';
-      link.href = src;
-      document.head.appendChild(link);
-    });
-  }
-
   musicBtn.addEventListener('click', function(){
     musicOn = !musicOn;
     musicBtn.classList.toggle('active', musicOn);
@@ -1129,14 +1096,9 @@
         fadeVolume(el, 0, TARGET_VOLUME, 1200);
         watchForCrossfade(el);
       }, { once:true });
-
-      // 用户主动开了音乐，说明确实需要，这时候再去预取曲库其余曲目最划算，
-      // 不打扰从没打开过音乐的访客的流量
-      if (window.requestIdleCallback){
-        requestIdleCallback(prefetchRemainingTracks);
-      } else {
-        setTimeout(prefetchRemainingTracks, 1500);
-      }
+      // 注：不再额外预取曲库其余曲目——crossfade 机制本身会在当前曲目
+      // 播放到剩 2.5 秒时就提前去加载下一首，这个提前量已经够用，
+      // 不需要再单独起一套预取逻辑
     } else {
       var current = audios[activeAudioIndex];
       fadeVolume(current, current.volume, 0, 800, function(){
@@ -1237,7 +1199,33 @@
 
   var countdownTimer  = null;
   var breathPhaseTimer = null;
+  var finaleTimer      = null;
   var remainingSeconds = 0;
+
+  var breathPoem   = document.getElementById('breathPoem');
+  var poemLine     = document.getElementById('poemLine');
+  var poemAuthor   = document.getElementById('poemAuthor');
+
+  // 诗句池：都扣“登高 / 望远 / 释怀”这个题，全部是公有领域的古典诗词
+  var POEMS = [
+    { line:'欲穷千里目，更上一层楼。', author:'王之涣 · 登鹳雀楼' },
+    { line:'行到水穷处，坐看云起时。', author:'王维 · 终南别业' },
+    { line:'起舞弄清影，何似在人间。', author:'苏轼 · 水调歌头' },
+    { line:'相看两不厌，只有敬亭山。', author:'李白 · 独坐敬亭山' },
+    { line:'不畏浮云遮望眼，只缘身在最高层。', author:'王安石 · 登飞来峰' },
+    { line:'会当凌绝顶，一览众山小。', author:'杜甫 · 望岳' }
+  ];
+  var lastPoemIndex = null;
+
+  function pickPoem(){
+    if (POEMS.length === 1) return POEMS[0];
+    var idx;
+    do {
+      idx = Math.floor(Math.random() * POEMS.length);
+    } while (idx === lastPoemIndex);
+    lastPoemIndex = idx;
+    return POEMS[idx];
+  }
 
   // 一次完整呼吸（吸气+呼气）的总时长，单位秒；吸气占 INHALE_RATIO，
   // 呼气占剩下的部分——呼气比吸气长，是刻意的：更长的呼气对应更放松的
@@ -1264,6 +1252,14 @@
     applyBreathRate();
   }
 
+  // 把气泡身上因为“破云见日”临时加的内联样式清空，恢复成默认的循环动画，供下次冥想使用
+  function resetBubbleFlourish(){
+    breathBubble.style.animation = '';
+    breathBubble.style.transform = '';
+    breathBubble.style.boxShadow = '';
+    breathBubble.style.transition = '';
+  }
+
   function startMeditation(minutes){
     remainingSeconds = minutes * 60;
     updateCountdownDisplay();
@@ -1285,7 +1281,7 @@
       remainingSeconds--;
       updateCountdownDisplay();
       if (remainingSeconds <= 0){
-        endMeditation();
+        naturalEnd();
       }
     }, 1000);
   }
@@ -1330,15 +1326,16 @@
   }
 
   // ============================================================
-  // 6. 优雅退出：倒计时结束 / Esc / 手机双击
+  // 6. 退出：分两种
+  //    · naturalEnd()   —— 倒计时自然走完：破云见日 + 一句诗，再淡出
+  //    · endMeditation() —— Esc / 双击：用户主动想立刻离开，跳过仪式，直接淡出
   // ============================================================
-  function endMeditation(){
-    clearInterval(countdownTimer);
-    clearTimeout(breathPhaseTimer);
-    countdownTimer = null;
-    breathPhaseTimer = null;
 
+  // 真正把冥想层收起来、解冻主界面——两条退出路径最终都会走到这里
+  function exitMeditation(){
     meditationLayer.classList.remove('active');
+    meditationLayer.classList.remove('finale');
+    resetBubbleFlourish();
 
     setTimeout(function(){
       document.body.classList.remove('meditating');
@@ -1347,6 +1344,45 @@
       startBtn.classList.remove('enabled');
       wake(); // 解冻并重新激活鼠标静止淡出监听，无缝回到隐形状态
     }, 1200);
+  }
+
+  function clearMeditationTimers(){
+    clearInterval(countdownTimer);
+    clearTimeout(breathPhaseTimer);
+    clearTimeout(finaleTimer);
+    countdownTimer = null;
+    breathPhaseTimer = null;
+    finaleTimer = null;
+  }
+
+  // 倒计时自然结束：气泡定格放大，光晕比平时更亮更大一瞬（“破云见日”），
+  // 停顿片刻后气泡本体隐去、诗句浮现，停留 8 秒，再一起淡出
+  function naturalEnd(){
+    clearMeditationTimers();
+
+    breathText.style.opacity = '0';
+    breathBubble.style.animation = 'none';
+    breathBubble.style.transform = 'scale(1.95)';
+    breathBubble.style.transition = 'box-shadow 1.3s ease, transform 1.3s ease';
+    breathBubble.style.boxShadow =
+      '0 0 90px 30px rgba(255,255,255,0.5), 0 0 200px 70px rgba(255,255,255,0.2)';
+
+    finaleTimer = setTimeout(function(){
+      var poem = pickPoem();
+      poemLine.textContent = poem.line;
+      poemAuthor.textContent = poem.author;
+      meditationLayer.classList.add('finale');
+
+      finaleTimer = setTimeout(function(){
+        exitMeditation();
+      }, 8000); // 诗句停留 8 秒
+    }, 1300);
+  }
+
+  // Esc / 双击：立刻退出，跳过破云见日和诗句
+  function endMeditation(){
+    clearMeditationTimers();
+    exitMeditation();
   }
 
   window.addEventListener('keydown', function(e){
