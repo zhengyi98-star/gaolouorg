@@ -885,47 +885,57 @@
   //    同一个按钮反复点击命中缓存的概率最高，值得覆盖全部
   // 2）其余分类：只预取“第一条”，给个头，真正点进去才会补齐剩下的
   // 每个分类只会被“全量预取”一次，不会重复占用带宽
+  //
+  // 关键点：预取绝不能跟“用户正在等着看的这个视频”抢带宽。
+  // requestIdleCallback 判断的是“主线程”是否空闲，跟“网络”是否空闲是两回事——
+  // JS 跑完几乎立刻主线程就空闲了，但这时候当前视频可能还在缓冲，
+  // 用 idle callback 反而会让预取紧贴着当前视频一起抢带宽，越预取越卡。
+  // 所以这里改成：固定延迟几秒 + 每条之间再错开时间 + 标记低优先级，
+  // 三重保证当前正在播的视频永远优先吃到带宽
   // ============================================================
   var fullyPrefetchedCategories = {};
+  var PREFETCH_START_DELAY = 5000;   // 页面/切换后先等 5 秒，把带宽让给当前视频
+  var PREFETCH_STAGGER     = 1500;   // 之后每一条预取请求之间再错开的间隔
 
-  function prefetchVideo(src){
-    var link = document.createElement('link');
-    link.rel = 'prefetch';
-    link.as = 'video';
-    link.href = src;
-    document.head.appendChild(link);
+  function prefetchVideo(src, delay){
+    setTimeout(function(){
+      var link = document.createElement('link');
+      link.rel = 'prefetch';
+      link.as = 'video';
+      link.href = src;
+      // 低优先级提示：明确告诉浏览器这些请求不急，谁都能插队（不支持的浏览器会忽略，无副作用）
+      try { link.fetchPriority = 'low'; } catch(e){}
+      document.head.appendChild(link);
+    }, delay);
   }
 
-  function prefetchCategoryFully(key){
+  function prefetchCategoryFully(key, baseDelay){
     if (fullyPrefetchedCategories[key]) return;
     fullyPrefetchedCategories[key] = true;
 
     var list = SCENES[key] && SCENES[key].videos;
     if (!list || !list.length) return;
-    list.forEach(function(entry){
-      prefetchVideo(normalizeEntry(entry).src);
+    list.forEach(function(entry, i){
+      prefetchVideo(normalizeEntry(entry).src, baseDelay + i * PREFETCH_STAGGER);
     });
   }
 
-  function prefetchOtherScenesFirstPick(currentKey){
-    SCENE_KEYS.forEach(function(k){
-      if (k === currentKey) return;
+  function prefetchOtherScenesFirstPick(currentKey, baseDelay){
+    var others = SCENE_KEYS.filter(function(k){ return k !== currentKey; });
+    others.forEach(function(k, i){
       var list = SCENES[k] && SCENES[k].videos;
       if (!list || !list.length) return;
-      prefetchVideo(normalizeEntry(list[0]).src);
+      prefetchVideo(normalizeEntry(list[0]).src, baseDelay + i * PREFETCH_STAGGER);
     });
   }
 
   function schedulePrefetch(key){
-    var run = function(){
-      prefetchCategoryFully(key);
-      prefetchOtherScenesFirstPick(key);
-    };
-    if (window.requestIdleCallback){
-      requestIdleCallback(run);
-    } else {
-      setTimeout(run, 1500);
-    }
+    setTimeout(function(){
+      // 当前分类的其余视频先来，其余分类的预取排在它们后面
+      var currentCount = (SCENES[key] && SCENES[key].videos && SCENES[key].videos.length) || 0;
+      prefetchCategoryFully(key, 0);
+      prefetchOtherScenesFirstPick(key, currentCount * PREFETCH_STAGGER);
+    }, PREFETCH_START_DELAY);
   }
 
   sceneButtons.forEach(function(btn){
