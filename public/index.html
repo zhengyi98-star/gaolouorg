@@ -756,6 +756,26 @@
     return m ? (m[1] + '.jpg') : null;
   }
 
+  // 全部分类、全部视频的海报图，页面一打开就立刻全量预加载——
+  // 海报图体积极小（几十 KB 一张），就算全部一起下载也几乎不会跟
+  // 正在播放的视频抢带宽，性价比最高，所以不用像视频那样错峰延迟，
+  // 直接抢在最前面做。效果是：不管用户先点哪个按钮、哪怕是第一次点，
+  // 封面图都已经在缓存里了，一点开就是秒开
+  function preloadAllPosters(){
+    SCENE_KEYS.forEach(function(key){
+      var list = SCENES[key] && SCENES[key].videos;
+      if (!list) return;
+      list.forEach(function(entry){
+        var norm = normalizeEntry(entry);
+        var posterPath = norm.poster || derivePosterPath(norm.src);
+        if (!posterPath) return;
+        var img = new Image();
+        img.src = posterPath; // 加载失败也静默无害，真正用到时会自动退回安全模式
+      });
+    });
+  }
+  preloadAllPosters();
+
   function pickVideoSrc(key){
     var list = SCENES[key] && SCENES[key].videos;
     if (!list || !list.length) return null;
@@ -772,6 +792,12 @@
 
   var videos = [document.getElementById('bg-video-1'), document.getElementById('bg-video-2')];
   var activeIndex = 0;
+  // 每次调用 switchScene 都会递增这个值，异步回调触发时会核对自己那一代
+  // 是不是还是“最新的一次切换”——如果切换过程中用户又点了别的按钮，
+  // 老的那次异步回调会识别出自己已经过期，直接放弃、不再生效。
+  // 这就避免了“快速连续点击时，两次切换抢用同一个 video 元素、
+  // 谁先谁后全看运气”的竞态问题（这也是切换速度“时快时慢”的常见成因之一）
+  var switchGeneration = 0;
   var sceneButtons = document.querySelectorAll('.scene-btn[data-scene]');
 
   // 若视频源被防盗链拦截、404 或格式不支持，会在控制台给出明确诊断信息，
@@ -800,6 +826,8 @@
     if (!picked) return;
     var actualSrc = pickBestSrc(picked); // 可能因为弱网降级成 srcLow
 
+    var myGeneration = ++switchGeneration; // 标记这是第几次切换，异步回调靠这个判断自己是否已过期
+
     var activeVideo = videos[activeIndex];
     var nextIndex   = 1 - activeIndex;
     var nextVideo   = videos[nextIndex];
@@ -807,6 +835,8 @@
     var fallbackTimer = null;
 
     function reveal(){
+      if (myGeneration !== switchGeneration) return; // 已经被更新的一次切换取代，放弃
+
       var playPromise = nextVideo.play();
       if (playPromise && playPromise.catch){
         playPromise.catch(function(err){
@@ -841,6 +871,7 @@
 
       // 3 秒硬性兜底：即使两个事件都没等到，也强制显示，避免无限期黑屏
       fallbackTimer = setTimeout(function(){
+        if (myGeneration !== switchGeneration) return;
         if (!triggered){
           console.warn('[高楼之巅] 视频 3 秒内未触发 loadeddata/canplay，已强制显示：', actualSrc);
         }
@@ -858,6 +889,7 @@
     if (posterPath){
       var probe = new Image();
       probe.onload = function(){
+        if (myGeneration !== switchGeneration) return;
         if (triggered) return;
         triggered = true;
         clearTimeout(fallbackTimer);
@@ -865,6 +897,7 @@
         reveal();
       };
       probe.onerror = function(){
+        if (myGeneration !== switchGeneration) return;
         console.warn('[高楼之巅] 海报图未找到或加载失败，已退回等待视频就绪的模式：', posterPath);
         nextVideo.removeAttribute('poster');
         gatedReveal();
