@@ -688,8 +688,7 @@
       videos:[
         '/videos/chongqing-1.mp4',
         '/videos/chongqing-2.mp4',
-        '/videos/chongqing-3.mp4',
-        '/videos/chongqing-4.mp4'
+        '/videos/chongqing-3.mp4'
         // 继续往下加即可，如 '/videos/chongqing-4.mp4', ...
       ]
     },
@@ -698,8 +697,7 @@
       videos:[
         '/videos/shanghai-1.mp4',
         '/videos/shanghai-2.mp4',
-        '/videos/shanghai-3.mp4',
-        '/videos/shanghai-4.mp4'
+        '/videos/shanghai-3.mp4'
       ]
     },
     snowmountain: {
@@ -707,8 +705,7 @@
       videos:[
         '/videos/snowmountain-1.mp4',
         '/videos/snowmountain-2.mp4',
-        '/videos/snowmountain-3.mp4',
-        '/videos/snowmountain-4.mp4'
+        '/videos/snowmountain-3.mp4'
       ]
     },
     cyberpunk: {
@@ -716,8 +713,7 @@
       videos:[
         '/videos/cyberpunk-1.mp4',
         '/videos/cyberpunk-2.mp4',
-        '/videos/cyberpunk-3.mp4',
-        '/videos/cyberpunk-4.mp4'
+        '/videos/cyberpunk-3.mp4'
       ]
     }
   };
@@ -883,36 +879,64 @@
     });
   }
 
-  sceneButtons.forEach(function(btn){
-    btn.addEventListener('click', function(){
-      switchScene(btn.dataset.scene);
+  // ============================================================
+  // 预取策略（分两档，随着素材库变大而调整）：
+  // 1）当前正在播放的分类：把它剩下的全部视频都预取一遍——
+  //    同一个按钮反复点击命中缓存的概率最高，值得覆盖全部
+  // 2）其余分类：只预取“第一条”，给个头，真正点进去才会补齐剩下的
+  // 每个分类只会被“全量预取”一次，不会重复占用带宽
+  // ============================================================
+  var fullyPrefetchedCategories = {};
+
+  function prefetchVideo(src){
+    var link = document.createElement('link');
+    link.rel = 'prefetch';
+    link.as = 'video';
+    link.href = src;
+    document.head.appendChild(link);
+  }
+
+  function prefetchCategoryFully(key){
+    if (fullyPrefetchedCategories[key]) return;
+    fullyPrefetchedCategories[key] = true;
+
+    var list = SCENES[key] && SCENES[key].videos;
+    if (!list || !list.length) return;
+    list.forEach(function(entry){
+      prefetchVideo(normalizeEntry(entry).src);
     });
-  });
+  }
 
-  switchScene(DEFAULT_SCENE);
-
-  // 浏览器空闲时，把其余几个分类各预取一条视频的字节缓存到本地，
-  // 之后用户点击那些按钮时大概率直接命中缓存，切换会明显更快。
-  // 只预取“一条”而不是全部素材库，避免无谓占用用户的移动网络流量
-  function prefetchOtherScenes(currentKey){
+  function prefetchOtherScenesFirstPick(currentKey){
     SCENE_KEYS.forEach(function(k){
       if (k === currentKey) return;
       var list = SCENES[k] && SCENES[k].videos;
       if (!list || !list.length) return;
-      var entry = normalizeEntry(list[0]);
-      var link = document.createElement('link');
-      link.rel = 'prefetch';
-      link.as = 'video';
-      link.href = entry.src;
-      document.head.appendChild(link);
+      prefetchVideo(normalizeEntry(list[0]).src);
     });
   }
 
-  if (window.requestIdleCallback){
-    requestIdleCallback(function(){ prefetchOtherScenes(DEFAULT_SCENE); });
-  } else {
-    setTimeout(function(){ prefetchOtherScenes(DEFAULT_SCENE); }, 2000);
+  function schedulePrefetch(key){
+    var run = function(){
+      prefetchCategoryFully(key);
+      prefetchOtherScenesFirstPick(key);
+    };
+    if (window.requestIdleCallback){
+      requestIdleCallback(run);
+    } else {
+      setTimeout(run, 1500);
+    }
   }
+
+  sceneButtons.forEach(function(btn){
+    btn.addEventListener('click', function(){
+      switchScene(btn.dataset.scene);
+      schedulePrefetch(btn.dataset.scene);
+    });
+  });
+
+  switchScene(DEFAULT_SCENE);
+  schedulePrefetch(DEFAULT_SCENE);
 
   // ============================================================
   // 3. 智能隐形逻辑（鼠标静止 3 秒自动隐藏）
