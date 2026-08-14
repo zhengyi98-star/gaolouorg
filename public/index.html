@@ -909,32 +909,41 @@
     }, delay);
   }
 
-  function prefetchCategoryFully(key, baseDelay){
-    if (fullyPrefetchedCategories[key]) return;
+  // 三级优先队列，对应真实的浏览行为：
+  // 第一梯队 —— 其余分类各一条：大多数人进站会把 4 个按钮先点一遍看看有什么，
+  //             这个需求最紧迫，排最前面
+  // 第二梯队 —— 当前分类的其余几条：用户正在这个分类里，继续深挖它的优先级其次
+  // 第三梯队 —— 其余分类剩下的几条：最边缘的需求，排最后
+  function buildPrefetchQueue(key){
+    var currentList = (SCENES[key] && SCENES[key].videos) || [];
+    var currentSrcs = currentList.map(function(entry){ return normalizeEntry(entry).src; });
+    // 当前正在播放的那一条已经在加载了，深度预取从第 2 条开始即可，不用重复排队
+    var currentRestSrcs = fullyPrefetchedCategories[key] ? [] : currentSrcs.slice(1);
     fullyPrefetchedCategories[key] = true;
 
-    var list = SCENES[key] && SCENES[key].videos;
-    if (!list || !list.length) return;
-    list.forEach(function(entry, i){
-      prefetchVideo(normalizeEntry(entry).src, baseDelay + i * PREFETCH_STAGGER);
-    });
-  }
+    var otherLists = SCENE_KEYS
+      .filter(function(k){ return k !== key; })
+      .map(function(k){
+        var list = SCENES[k] && SCENES[k].videos;
+        return (list || []).map(function(entry){ return normalizeEntry(entry).src; });
+      });
 
-  function prefetchOtherScenesFirstPick(currentKey, baseDelay){
-    var others = SCENE_KEYS.filter(function(k){ return k !== currentKey; });
-    others.forEach(function(k, i){
-      var list = SCENES[k] && SCENES[k].videos;
-      if (!list || !list.length) return;
-      prefetchVideo(normalizeEntry(list[0]).src, baseDelay + i * PREFETCH_STAGGER);
+    var otherFirstSrcs = otherLists.map(function(list){ return list[0]; }).filter(Boolean);
+
+    var otherRestSrcs = [];
+    otherLists.forEach(function(list){
+      otherRestSrcs = otherRestSrcs.concat(list.slice(1));
     });
+
+    return otherFirstSrcs.concat(currentRestSrcs).concat(otherRestSrcs);
   }
 
   function schedulePrefetch(key){
     setTimeout(function(){
-      // 当前分类的其余视频先来，其余分类的预取排在它们后面
-      var currentCount = (SCENES[key] && SCENES[key].videos && SCENES[key].videos.length) || 0;
-      prefetchCategoryFully(key, 0);
-      prefetchOtherScenesFirstPick(key, currentCount * PREFETCH_STAGGER);
+      var queue = buildPrefetchQueue(key);
+      queue.forEach(function(src, i){
+        prefetchVideo(src, i * PREFETCH_STAGGER);
+      });
     }, PREFETCH_START_DELAY);
   }
 
