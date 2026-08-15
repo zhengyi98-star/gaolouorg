@@ -1149,14 +1149,11 @@
   // 进站默认展示一个随机分类的封面图（不加载视频，视频等用户点了才开始）
   // 只从控制面板常驻的 4 个里挑，不用“更多城市”里那些还没配真实素材的占位分类
   (function showDefaultPoster(){
-    var defaultKey = MAIN_SCENE_KEYS[Math.floor(Math.random() * MAIN_SCENE_KEYS.length)];
-    var firstEntry = SCENES[defaultKey].videos[0];
-    var posterPath = derivePosterPath(firstEntry.src);
-    if (posterPath) bgImage.src = posterPath;
-    sceneButtons.forEach(function(btn){
-      btn.classList.toggle('active', btn.dataset.scene === defaultKey);
-    });
-    currentSceneKey = null; // 还没真正“选中”任何分类的视频，保留 null，方便第一次点击时从第 1 条开始
+    // 首页默认画面固定用一张专门设计的静态图（融合城市与雪山两个主题），
+    // 不再随机挑某个分类的封面——进站第一眼保持稳定、可预期，
+    // “随机”这件事留给用户自己点按钮去体验就好
+    bgImage.src = '/hero-cover.jpg';
+    currentSceneKey = null; // 还没真正“选中”任何分类，保留 null，方便第一次点击时从第 1 条开始
   })();
 
   // ============================================================
