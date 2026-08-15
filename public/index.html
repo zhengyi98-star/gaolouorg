@@ -79,7 +79,7 @@
   #bg-video{
     z-index:1;    /* 叠在图片上方，只有加载好、淡入之后才会盖住图片 */
     opacity:0;
-    transition: opacity 1.2s ease;
+    transition: opacity 0.3s ease;
   }
   #bg-video.active{
     opacity:1;
@@ -1133,7 +1133,8 @@
         }
         reveal();
       }, 3000);
-    }, 300); // 给旧视频的淡出动画留一点时间，避免瞬间跳变
+    }, 300); // 等旧视频完全淡出（跟 CSS 的 0.3s 过渡时长精确对应）才换 src，
+              // 这两个数字必须一致，不然又会重演“内容中途被抽换”的问题
 
     sceneButtons.forEach(function(btn){
       btn.classList.toggle('active', btn.dataset.scene === key);
