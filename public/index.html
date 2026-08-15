@@ -1060,6 +1060,9 @@
   // 2. 点击才加载：图片先秒切到位，视频这时候才真正开始请求，
   //    加载好之前，下面的图片全程兜底，不会有黑屏或闪烁
   // ============================================================
+  var pendingCanplayHandler = null; // 追踪上一次还没完成的加载监听，切换时先清理，避免堆积
+  var pendingFallbackTimer  = null;
+
   function selectScene(key){
     var list = SCENES[key] && SCENES[key].videos;
     if (!list || !list.length) return;
@@ -1085,20 +1088,49 @@
 
     bgVideo.classList.remove('active'); // 先淡出旧视频，露出下面已经换好的图
 
+    // 清理上一次还没完成的监听和兜底计时器，避免多次快速切换时越攒越多
+    if (pendingCanplayHandler){
+      bgVideo.removeEventListener('canplay', pendingCanplayHandler);
+      pendingCanplayHandler = null;
+    }
+    clearTimeout(pendingFallbackTimer);
+
     setTimeout(function(){
       if (myGeneration !== switchGeneration) return; // 切换过程中又点了别的，放弃这一次
 
       bgVideo.src = entry.src;
       bgVideo.load();
 
-      function onReady(){
+      var triggered = false;
+
+      function reveal(){
+        if (triggered) return;
+        triggered = true;
         bgVideo.removeEventListener('canplay', onReady);
+        clearTimeout(pendingFallbackTimer);
+        pendingCanplayHandler = null;
         if (myGeneration !== switchGeneration) return;
+
         var p = bgVideo.play();
         if (p && p.catch){ p.catch(function(err){ console.warn('[高楼之巅] 视频播放被浏览器拦截或失败：', err); }); }
         bgVideo.classList.add('active');
       }
+
+      function onReady(){
+        reveal();
+      }
+      pendingCanplayHandler = onReady;
       bgVideo.addEventListener('canplay', onReady);
+
+      // 3 秒硬性兜底：某些视频文件编码有问题、或网络不稳定，canplay 可能迟迟不触发
+      // 甚至永远不触发——没有这个兜底，就会一直卡在只看到图片、看不到视频的状态
+      pendingFallbackTimer = setTimeout(function(){
+        if (myGeneration !== switchGeneration) return;
+        if (!triggered){
+          console.warn('[高楼之巅] 视频 3 秒内未触发 canplay，已强制显示（该视频文件可能存在编码或网络问题）：', entry.src);
+        }
+        reveal();
+      }, 3000);
     }, 300); // 给旧视频的淡出动画留一点时间，避免瞬间跳变
 
     sceneButtons.forEach(function(btn){
