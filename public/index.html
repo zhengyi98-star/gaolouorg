@@ -1088,7 +1088,14 @@
 
     showLandmarkCaption(entry.landmark); // 每一条视频有自己的小注，不再是整个分类共用一句
 
-    bgVideo.classList.remove('active'); // 先淡出旧视频，露出下面已经换好的图
+    // 离开旧视频要立刻隐藏、不要任何过渡动画——不然旧场景哪怕只多停留 0.3 秒，
+    // 肉眼也会先看到旧的、才看到新的，跟“一点击就该是新分类”的预期是反的。
+    // 新视频加载好之后的淡入还是要保留（在 reveal() 里用回 CSS 定义的过渡），
+    // 只是“离开”这一步单独关掉过渡，做成瞬间切换
+    bgVideo.style.transition = 'none';
+    bgVideo.classList.remove('active');
+    void bgVideo.offsetWidth; // 强制重绘，确保上面这行立刻生效，不被合并进后面的过渡里
+    bgVideo.style.transition = '';
 
     // 清理上一次还没完成的监听和兜底计时器，避免多次快速切换时越攒越多
     if (pendingCanplayHandler){
@@ -1097,44 +1104,39 @@
     }
     clearTimeout(pendingFallbackTimer);
 
-    setTimeout(function(){
-      if (myGeneration !== switchGeneration) return; // 切换过程中又点了别的，放弃这一次
+    bgVideo.src = entry.src;
+    bgVideo.load();
 
-      bgVideo.src = entry.src;
-      bgVideo.load();
+    var triggered = false;
 
-      var triggered = false;
+    function reveal(){
+      if (triggered) return;
+      triggered = true;
+      bgVideo.removeEventListener('canplay', onReady);
+      clearTimeout(pendingFallbackTimer);
+      pendingCanplayHandler = null;
+      if (myGeneration !== switchGeneration) return;
 
-      function reveal(){
-        if (triggered) return;
-        triggered = true;
-        bgVideo.removeEventListener('canplay', onReady);
-        clearTimeout(pendingFallbackTimer);
-        pendingCanplayHandler = null;
-        if (myGeneration !== switchGeneration) return;
+      var p = bgVideo.play();
+      if (p && p.catch){ p.catch(function(err){ console.warn('[高楼之巅] 视频播放被浏览器拦截或失败：', err); }); }
+      bgVideo.classList.add('active');
+    }
 
-        var p = bgVideo.play();
-        if (p && p.catch){ p.catch(function(err){ console.warn('[高楼之巅] 视频播放被浏览器拦截或失败：', err); }); }
-        bgVideo.classList.add('active');
+    function onReady(){
+      reveal();
+    }
+    pendingCanplayHandler = onReady;
+    bgVideo.addEventListener('canplay', onReady);
+
+    // 3 秒硬性兜底：某些视频文件编码有问题、或网络不稳定，canplay 可能迟迟不触发
+    // 甚至永远不触发——没有这个兜底，就会一直卡在只看到图片、看不到视频的状态
+    pendingFallbackTimer = setTimeout(function(){
+      if (myGeneration !== switchGeneration) return;
+      if (!triggered){
+        console.warn('[高楼之巅] 视频 3 秒内未触发 canplay，已强制显示（该视频文件可能存在编码或网络问题）：', entry.src);
       }
-
-      function onReady(){
-        reveal();
-      }
-      pendingCanplayHandler = onReady;
-      bgVideo.addEventListener('canplay', onReady);
-
-      // 3 秒硬性兜底：某些视频文件编码有问题、或网络不稳定，canplay 可能迟迟不触发
-      // 甚至永远不触发——没有这个兜底，就会一直卡在只看到图片、看不到视频的状态
-      pendingFallbackTimer = setTimeout(function(){
-        if (myGeneration !== switchGeneration) return;
-        if (!triggered){
-          console.warn('[高楼之巅] 视频 3 秒内未触发 canplay，已强制显示（该视频文件可能存在编码或网络问题）：', entry.src);
-        }
-        reveal();
-      }, 3000);
-    }, 300); // 等旧视频完全淡出（跟 CSS 的 0.3s 过渡时长精确对应）才换 src，
-              // 这两个数字必须一致，不然又会重演“内容中途被抽换”的问题
+      reveal();
+    }, 3000);
 
     sceneButtons.forEach(function(btn){
       btn.classList.toggle('active', btn.dataset.scene === key);
