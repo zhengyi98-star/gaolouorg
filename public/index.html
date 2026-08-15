@@ -38,27 +38,20 @@
   html, body{
     width:100%; height:100%;
     overflow:hidden;
-    /* 即使视频加载失败，也不会是死气沉沉的纯黑，而是一层有呼吸感的夜色渐变 */
+    /* 即使图片加载失败，也不会是死气沉沉的纯黑，而是一层有呼吸感的夜色渐变 */
     background: radial-gradient(ellipse at 50% 40%, #1b212c 0%, #0a0c10 65%, #050608 100%);
     font-family: 'Noto Sans SC', -apple-system, 'PingFang SC', 'Helvetica Neue', sans-serif;
     cursor: default;
   }
 
-  /* ============ 原生 <video> 背景层 ============ */
-  /* 满铺裁切方案：直接把视频框定为 100vw × 100vh，再用 object-fit: cover 裁切，
-     不管视频原始分辨率或宽高比是多少都能正确居中裁切满屏。
-     （注：之前用的是 min-width/min-height:100% + width/height:auto 的老技巧，
-     这套写法在源视频宽高比与屏幕差异较大、尤其是高分辨率素材时，
-     会把视频框撑得远大于视口，叠加 object-fit:cover 后只截取到其中一角，
-     这正是“视频显示不全、只看到一个角落”的根因，现已彻底改用更稳健的写法） */
-
-  /* ============ 背景层：常驻图 + 按需视频 ============ */
+  /* ============ 背景层：两张图交叉淡入淡出 ============ */
   /* 满铺裁切方案：直接把元素框定为 100vw × 100vh，再用 object-fit: cover 裁切，
      不管素材原始分辨率或宽高比是多少都能正确居中裁切满屏。
-     （注：之前用的是 min-width/min-height:100% + width/height:auto 的老技巧，
-     这套写法在源素材宽高比与屏幕差异较大、尤其是高分辨率素材时，
-     会把框撑得远大于视口，叠加 object-fit:cover 后只截取到其中一角，
-     这正是“画面显示不全、只看到一个角落”的根因，现已彻底改用更稳健的写法） */
+     （注：早期用过 min-width/min-height:100% + width/height:auto 的老技巧，
+     这套写法在源素材宽高比与屏幕差异较大时会把框撑得远大于视口，叠加
+     object-fit:cover 后只截取到其中一角，现已改用更稳健的写法；
+     背景本身也已经从 <video> 全部换成 <img>，不再需要处理视频解码/
+     缓冲相关的一整套复杂逻辑，这是全站目前最大的一次简化） */
 
   .bg-layer{
     position:fixed;
@@ -70,25 +63,21 @@
     pointer-events:none;      /* 关键防干扰：彻底禁止对背景的任何点击/长按交互 */
     user-select:none;
     background:#000;
-  }
-
-  #bg-image{
-    z-index:0;    /* 图片永远在最底层、永远可见，负责“进站瞬间不卡顿”和视频加载期间兜底 */
-  }
-
-  #bg-video{
-    z-index:1;    /* 叠在图片上方，只有加载好、淡入之后才会盖住图片 */
+    z-index:0;
     opacity:0;
     transition: opacity 0.3s ease;
   }
-  #bg-video.active{
+  .bg-layer.active{
     opacity:1;
+    z-index:1;    /* 正在显示的那张图叠在上面，避免两张都 opacity:0 时露出中间的黑底 */
   }
 
-  /* 夜间遮罩滤镜层：压暗视频，保证悬浮文字清晰可读
-     注意：这里刻意不用 backdrop-filter —— 它在采样 <video> 元素背后画面时
-     在 Chromium 上有已知问题（视频常被提升到独立合成层，backdrop-filter 采样不到，
-     导致整层渲染成纯黑），改用纯色半透明叠加来压暗，效果一致且稳定可靠 */
+  /* 夜间遮罩滤镜层：压暗画面，保证悬浮文字清晰可读
+     注意：这里没有用 backdrop-filter，是历史遗留——以前背景是 <video> 时，
+     backdrop-filter 在 Chromium 上采样视频背后画面有已知问题（视频常被提升到
+     独立合成层，backdrop-filter 采样不到，导致整层渲染成纯黑）。
+     现在背景已经全部改成图片，这个问题理论上不存在了，但纯色半透明叠加这个
+     方案本身运行得很稳定，没必要为了“理论上更优雅”去动一个没问题的东西 */
   #bg-veil{
     position:fixed;
     inset:0;
@@ -751,22 +740,21 @@
   /* 无障碍：尊重系统的“减少动态效果”偏好 */
   @media (prefers-reduced-motion: reduce){
     .ui-fade{ transition-duration: 0.2s !important; }
-    #bg-video{ transition-duration: 0.2s !important; }
+    .bg-layer{ transition-duration: 0.15s !important; }
     .breath-bubble{ animation-duration: 12s; }
   }
 </style>
 </head>
 <body>
 
-  <!-- ============ 背景层：一张常驻的图 + 一个按需加载的视频 ============ -->
-  <!-- bg-image 永远在最底层、永远可见——进站瞬间就能看到画面，不等任何视频；
-       bg-video 叠在上面，只有用户点了某个分类之后才会真正开始加载和播放，
-       加载好之前，下面的图（已经先一步换成目标场景的封面）负责兜底，不会有黑屏 -->
-  <img id="bg-image" class="bg-layer" alt="">
-  <video id="bg-video" class="bg-layer" autoplay loop muted playsinline></video>
+  <!-- ============ 背景层：两张图交叉淡入淡出 ============ -->
+  <!-- 已彻底去掉视频，全站背景改用图片——图片早就全部预加载过，
+       切换不再需要任何“等就绪”的逻辑，点了就是秒切 -->
+  <img id="bg-image-1" class="bg-layer" alt="">
+  <img id="bg-image-2" class="bg-layer" alt="">
 
   <!-- ============ 背景音乐（默认不自动播放，需用户手动点开）============ -->
-  <!-- 两个 <audio> 交替使用，实现无缝交叉淡入淡出切歌，用法和背景视频完全对称 -->
+  <!-- 两个 <audio> 交替使用，实现无缝交叉淡入淡出切歌，用法和背景图完全对称 -->
   <audio id="bg-audio-1" preload="none"></audio>
   <audio id="bg-audio-2" preload="none"></audio>
 
@@ -857,9 +845,8 @@
   </div>
 
   <!-- ============ 更多城市 · 展开面板 ============ -->
-  <!-- 目前是占位骨架：下面几个分类还没有真实视频/封面文件，点击后会尝试加载
-       但会失败（控制台能看到诊断信息）——等你把 /videos/dubai-1.mp4 这类文件
-       换成真实素材、生成好同名封面图，这几个按钮就会正常工作，逻辑不用改 -->
+  <!-- 直接复用之前生成的封面图（迪拜等 4 个之前已经确认过图片能正常访问），
+       现在背景已经全部改用图片，这几个按钮不需要额外准备视频素材就能正常工作 -->
   <div class="more-cities-panel" id="moreCitiesPanel">
     <div class="more-cities-panel__label">更多城市</div>
     <div class="more-cities-panel__list">
@@ -920,49 +907,49 @@
 (function(){
 
   // ============================================================
-  // 1. 场景配置 —— 每个场景可以挂若干条视频。
-  //    第一次点某个分类按钮，显示这个分类的第 1 条；
-  //    再点同一个按钮，换成第 2 条，依次循环——
+  // 1. 场景配置 —— 每个场景可以挂若干张图片。
+  //    第一次点某个分类按钮，显示这个分类的第 1 张；
+  //    再点同一个按钮，换成第 2 张，依次循环——
   //    比如“魔幻重庆”连点两次，就是“重庆一 → 重庆二”。
   //    素材库大小完全灵活，往数组里加/删链接即可，不用碰下面的逻辑代码
   // ============================================================
   var SCENES = {
     chongqing: {
       name:'魔幻重庆',
-      videos:[
-        { src:'/videos/chongqing-1.mp4', landmark:'重庆来福士（朝天扬帆） · 354.5米' },
-        { src:'/videos/chongqing-2.mp4', landmark:'重庆环球金融中心 · 338.9米' },
-        { src:'/videos/chongqing-3.mp4', landmark:'九龙仓国际金融中心 · 316.3米' },
-        { src:'/videos/chongqing-4.mp4', landmark:'天和国际中心 · 301.75米' }
+      images:[
+        { src:'/videos/chongqing-1.jpg', landmark:'重庆来福士（朝天扬帆） · 354.5米' },
+        { src:'/videos/chongqing-2.jpg', landmark:'重庆环球金融中心 · 338.9米' },
+        { src:'/videos/chongqing-3.jpg', landmark:'九龙仓国际金融中心 · 316.3米' },
+        { src:'/videos/chongqing-4.jpg', landmark:'天和国际中心 · 301.75米' }
       ]
     },
     shanghai: {
       name:'都市上海',
-      videos:[
-        { src:'/videos/shanghai-1.mp4', landmark:'上海中心大厦 · 632米' },
-        { src:'/videos/shanghai-2.mp4', landmark:'上海环球金融中心 · 492米' },
-        { src:'/videos/shanghai-3.mp4', landmark:'金茂大厦 · 420.5米' },
-        { src:'/videos/shanghai-4.mp4', landmark:'东方明珠塔 · 468米' }
+      images:[
+        { src:'/videos/shanghai-1.jpg', landmark:'上海中心大厦 · 632米' },
+        { src:'/videos/shanghai-2.jpg', landmark:'上海环球金融中心 · 492米' },
+        { src:'/videos/shanghai-3.jpg', landmark:'金茂大厦 · 420.5米' },
+        { src:'/videos/shanghai-4.jpg', landmark:'东方明珠塔 · 468米' }
       ]
     },
     snowmountain: {
       name:'治愈雪山',
-      videos:[
-        { src:'/videos/snowmountain-1.mp4', landmark:'珠穆朗玛峰 · 8848.86米（亚洲最高峰）' },
-        { src:'/videos/snowmountain-2.mp4', landmark:'阿空加瓜峰 · 6961米（南美洲最高峰）' },
-        { src:'/videos/snowmountain-3.mp4', landmark:'迪纳利峰 · 6190米（北美洲最高峰）' },
-        { src:'/videos/snowmountain-4.mp4', landmark:'乞力马扎罗山 · 5895米（非洲最高峰）' }
+      images:[
+        { src:'/videos/snowmountain-1.jpg', landmark:'珠穆朗玛峰 · 8848.86米（亚洲最高峰）' },
+        { src:'/videos/snowmountain-2.jpg', landmark:'阿空加瓜峰 · 6961米（南美洲最高峰）' },
+        { src:'/videos/snowmountain-3.jpg', landmark:'迪纳利峰 · 6190米（北美洲最高峰）' },
+        { src:'/videos/snowmountain-4.jpg', landmark:'乞力马扎罗山 · 5895米（非洲最高峰）' }
         // 七大洲最高峰还剩：厄尔布鲁士峰 5642米（欧洲）、文森峰 4892米（南极洲）、
-        // 查亚峰 4884米（大洋洲）——想凑齐一整套，往上加视频条目即可
+        // 查亚峰 4884米（大洋洲）——想凑齐一整套，往上加条目即可
       ]
     },
     cyberpunk: {
       name:'虚拟夜之城',
-      videos:[
-        { src:'/videos/cyberpunk-1.mp4', landmark:'' },
-        { src:'/videos/cyberpunk-2.mp4', landmark:'' },
-        { src:'/videos/cyberpunk-3.mp4', landmark:'' },
-        { src:'/videos/cyberpunk-4.mp4', landmark:'' }
+      images:[
+        { src:'/videos/cyberpunk-1.jpg', landmark:'' },
+        { src:'/videos/cyberpunk-2.jpg', landmark:'' },
+        { src:'/videos/cyberpunk-3.jpg', landmark:'' },
+        { src:'/videos/cyberpunk-4.jpg', landmark:'' }
         // 虚构场景没有真实地标，想加氛围文字可以按自己的设定填，
         // 比如「新宿零区 · 388层」这种
       ]
@@ -970,31 +957,30 @@
 
     // ============================================================
     // “更多城市”——控制面板放不下更多图标了，这几个放进单独的展开面板。
-    // 目前是占位骨架：视频/封面文件还没有，先把结构和真实地标数据搭好，
-    // 等你有素材了直接把 /videos/xxx.mp4 换成真实文件即可，逻辑不用碰
+    // 这几张封面图之前生成视频海报时其实已经传上去了，直接复用，不用额外准备素材
     // ============================================================
     dubai: {
       name:'迪拜',
-      videos:[
-        { src:'/videos/dubai-1.mp4', landmark:'哈利法塔 · 828米（世界最高建筑）' }
+      images:[
+        { src:'/videos/dubai-1.jpg', landmark:'哈利法塔 · 828米（世界最高建筑）' }
       ]
     },
     newyork: {
       name:'纽约',
-      videos:[
-        { src:'/videos/newyork-1.mp4', landmark:'世界贸易中心一号楼 · 541米' }
+      images:[
+        { src:'/videos/newyork-1.jpg', landmark:'世界贸易中心一号楼 · 541米' }
       ]
     },
     hongkong: {
       name:'香港',
-      videos:[
-        { src:'/videos/hongkong-1.mp4', landmark:'环球贸易广场（ICC） · 484米' }
+      images:[
+        { src:'/videos/hongkong-1.jpg', landmark:'环球贸易广场（ICC） · 484米' }
       ]
     },
     tokyo: {
       name:'东京',
-      videos:[
-        { src:'/videos/tokyo-1.mp4', landmark:'麻布台之丘森大厦 · 325米' }
+      images:[
+        { src:'/videos/tokyo-1.jpg', landmark:'麻布台之丘森大厦 · 325米' }
       ]
     }
   };
@@ -1002,39 +988,30 @@
   var MAIN_SCENE_KEYS = ['chongqing', 'shanghai', 'snowmountain', 'cyberpunk']; // 控制面板上常驻的 4 个
   var EXTRA_SCENE_KEYS = ['dubai', 'newyork', 'hongkong', 'tokyo'];             // 收进“更多城市”面板的
 
-  // 按“同名约定”推导海报图路径：/videos/chongqing-1.mp4 → /videos/chongqing-1.jpg
-  function derivePosterPath(src){
-    var m = src.match(/^(.*)\.[a-zA-Z0-9]+$/);
-    return m ? (m[1] + '.jpg') : null;
-  }
-
-  // 全部分类、全部视频的海报图，页面一打开就立刻全量预加载——
-  // 海报图体积极小（几十 KB 一张），这一步做完之后，不管用户先点哪个按钮，
-  // 背景图都是秒切；真正的视频文件完全不预加载，只有点了才会去请求
-  function preloadAllPosters(){
+  // 全部分类、全部图片，页面一打开就立刻全量预加载——图片体积小，
+  // 这一步做完之后，不管用户先点哪个按钮，画面都是秒切
+  function preloadAllImages(){
     SCENE_KEYS.forEach(function(key){
-      var list = SCENES[key] && SCENES[key].videos;
+      var list = SCENES[key] && SCENES[key].images;
       if (!list) return;
       list.forEach(function(entry){
-        var posterPath = derivePosterPath(entry.src);
-        if (!posterPath) return;
         var img = new Image();
-        img.src = posterPath; // 加载失败也静默无害
+        img.src = entry.src; // 加载失败也静默无害
       });
     });
   }
-  preloadAllPosters();
+  preloadAllImages();
 
-  var bgImage = document.getElementById('bg-image');
-  var bgVideo = document.getElementById('bg-video');
+  // 两张 <img> 交替使用，实现无缝交叉淡入淡出，用法和背景音乐完全对称
+  var bgImages = [document.getElementById('bg-image-1'), document.getElementById('bg-image-2')];
+  var activeImageIndex = 0;
   // 用统一的 [data-scene] 选择器，这样控制面板上的 4 个常驻按钮，
   // 和“更多城市”展开面板里的按钮，可以共用同一套点击/高亮逻辑
   var sceneButtons = document.querySelectorAll('[data-scene]');
   var landmarkCaption = document.getElementById('landmarkCaption');
 
   var currentSceneKey = null;
-  var currentVideoIndex = {}; // 记住每个分类目前放到第几条了，方便“再点一次换下一条”
-  var switchGeneration = 0;   // 防止快速连点时，旧的一次切换在新的一次之后才完成而覆盖画面
+  var currentImageIndex = {}; // 记住每个分类目前放到第几张了，方便“再点一次换下一张”
   var landmarkTimer = null;
 
   function showLandmarkCaption(text){
@@ -1050,93 +1027,43 @@
     }, 3500);
   }
 
-  bgVideo.addEventListener('error', function(){
-    console.error(
-      '[高楼之巅] 背景视频加载失败：' + (bgVideo.currentSrc || bgVideo.src) +
-      '\n常见原因：1) 视频源开启了防盗链（Referer 校验），需自建托管；' +
-      '2) 链接失效或跨域被拒绝；3) 网络无法访问该域名。'
-    );
+  bgImages.forEach(function(img){
+    img.addEventListener('error', function(){
+      console.error(
+        '[高楼之巅] 背景图加载失败：' + img.src +
+        '\n请确认文件已放进 public/videos/ 目录，且路径与真实文件名完全一致。'
+      );
+    });
   });
 
   // ============================================================
-  // 2. 点击才加载：图片先秒切到位，视频这时候才真正开始请求，
-  //    加载好之前，下面的图片全程兜底，不会有黑屏或闪烁
+  // 2. 点击即切换：图片早就预加载过，直接换 src、做个交叉淡入淡出即可——
+  //    换成图片之后不再需要任何“等就绪”的逻辑，这是这次简化最大的收益
   // ============================================================
-  var pendingCanplayHandler = null; // 追踪上一次还没完成的加载监听，切换时先清理，避免堆积
-  var pendingFallbackTimer  = null;
-
   function selectScene(key){
-    var list = SCENES[key] && SCENES[key].videos;
+    var list = SCENES[key] && SCENES[key].images;
     if (!list || !list.length) return;
 
     var idx;
     if (key === currentSceneKey && list.length > 1){
-      idx = ((currentVideoIndex[key] || 0) + 1) % list.length; // 同一个分类再点一次，换下一条
+      idx = ((currentImageIndex[key] || 0) + 1) % list.length; // 同一个分类再点一次，换下一张
     } else {
-      idx = currentVideoIndex[key] || 0;
+      idx = currentImageIndex[key] || 0;
     }
-    currentVideoIndex[key] = idx;
+    currentImageIndex[key] = idx;
     currentSceneKey = key;
 
     var entry = list[idx];
-    var posterPath = derivePosterPath(entry.src);
-    var myGeneration = ++switchGeneration;
+    showLandmarkCaption(entry.landmark); // 每一张图有自己的小注
 
-    if (posterPath){
-      bgImage.src = posterPath; // 已经预加载过，这一步几乎瞬时
-    }
+    var activeImg  = bgImages[activeImageIndex];
+    var nextIndex  = 1 - activeImageIndex;
+    var nextImg    = bgImages[nextIndex];
 
-    showLandmarkCaption(entry.landmark); // 每一条视频有自己的小注，不再是整个分类共用一句
-
-    // 离开旧视频要立刻隐藏、不要任何过渡动画——不然旧场景哪怕只多停留 0.3 秒，
-    // 肉眼也会先看到旧的、才看到新的，跟“一点击就该是新分类”的预期是反的。
-    // 新视频加载好之后的淡入还是要保留（在 reveal() 里用回 CSS 定义的过渡），
-    // 只是“离开”这一步单独关掉过渡，做成瞬间切换
-    bgVideo.style.transition = 'none';
-    bgVideo.classList.remove('active');
-    void bgVideo.offsetWidth; // 强制重绘，确保上面这行立刻生效，不被合并进后面的过渡里
-    bgVideo.style.transition = '';
-
-    // 清理上一次还没完成的监听和兜底计时器，避免多次快速切换时越攒越多
-    if (pendingCanplayHandler){
-      bgVideo.removeEventListener('canplay', pendingCanplayHandler);
-      pendingCanplayHandler = null;
-    }
-    clearTimeout(pendingFallbackTimer);
-
-    bgVideo.src = entry.src;
-    bgVideo.load();
-
-    var triggered = false;
-
-    function reveal(){
-      if (triggered) return;
-      triggered = true;
-      bgVideo.removeEventListener('canplay', onReady);
-      clearTimeout(pendingFallbackTimer);
-      pendingCanplayHandler = null;
-      if (myGeneration !== switchGeneration) return;
-
-      var p = bgVideo.play();
-      if (p && p.catch){ p.catch(function(err){ console.warn('[高楼之巅] 视频播放被浏览器拦截或失败：', err); }); }
-      bgVideo.classList.add('active');
-    }
-
-    function onReady(){
-      reveal();
-    }
-    pendingCanplayHandler = onReady;
-    bgVideo.addEventListener('canplay', onReady);
-
-    // 3 秒硬性兜底：某些视频文件编码有问题、或网络不稳定，canplay 可能迟迟不触发
-    // 甚至永远不触发——没有这个兜底，就会一直卡在只看到图片、看不到视频的状态
-    pendingFallbackTimer = setTimeout(function(){
-      if (myGeneration !== switchGeneration) return;
-      if (!triggered){
-        console.warn('[高楼之巅] 视频 3 秒内未触发 canplay，已强制显示（该视频文件可能存在编码或网络问题）：', entry.src);
-      }
-      reveal();
-    }, 3000);
+    nextImg.src = entry.src; // 早就预加载过，这一步几乎瞬时
+    nextImg.classList.add('active');
+    activeImg.classList.remove('active');
+    activeImageIndex = nextIndex;
 
     sceneButtons.forEach(function(btn){
       btn.classList.toggle('active', btn.dataset.scene === key);
@@ -1149,14 +1076,14 @@
     });
   });
 
-  // 进站默认展示一个随机分类的封面图（不加载视频，视频等用户点了才开始）
-  // 只从控制面板常驻的 4 个里挑，不用“更多城市”里那些还没配真实素材的占位分类
-  (function showDefaultPoster(){
-    // 首页默认画面固定用一张专门设计的静态图（融合城市与雪山两个主题），
-    // 不再随机挑某个分类的封面——进站第一眼保持稳定、可预期，
-    // “随机”这件事留给用户自己点按钮去体验就好
-    bgImage.src = '/hero-cover.jpg';
-    currentSceneKey = null; // 还没真正“选中”任何分类，保留 null，方便第一次点击时从第 1 条开始
+  // 进站默认画面固定用一张专门设计的静态图（融合城市与雪山两个主题），
+  // 不随机挑某个分类的封面——进站第一眼保持稳定、可预期，
+  // “随机”这件事留给用户自己点按钮去体验就好
+  (function showDefaultImage(){
+    var img = bgImages[activeImageIndex];
+    img.src = '/hero-cover.jpg';
+    img.classList.add('active');
+    currentSceneKey = null; // 还没真正“选中”任何分类，保留 null，方便第一次点击时从第 1 张开始
   })();
 
   // ============================================================
@@ -1185,7 +1112,7 @@
   window.addEventListener('contextmenu', function(e){ e.preventDefault(); });
 
   // ============================================================
-  // 背景音乐：像视频一样支持“素材库 + 随机播放”，用双 <audio> 交叉淡入淡出
+  // 背景音乐：跟背景图一样支持“素材库 + 随机播放”，用双 <audio> 交叉淡入淡出
   // 实现无缝切歌，一首快放完时提前切下一首，不会有静音空隙。
   // 默认不自动播放（浏览器策略也不允许带声音的音频自动播放），需要用户主动点开。
   // 曲库大小完全灵活，往数组里加/删链接即可
