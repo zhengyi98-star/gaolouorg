@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>关于 | 高楼之巅 gaolou.org</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400&family=Cormorant+Garamond:ital,wght@0,300;1,300&display=swap" rel="stylesheet">
+<style>
+  *{ margin:0; padding:0; box-sizing:border-box; }
+
+  html, body{
+    background: radial-gradient(ellipse at 50% 20%, #1b212c 0%, #0a0c10 60%, #050608 100%);
+    color: rgba(255,255,255,0.85);
+    font-family: 'Noto Sans SC', -apple-system, 'PingFang SC', 'Helvetica Neue', sans-serif;
+    font-weight: 300;
+    line-height: 1.9;
+    min-height: 100vh;
+  }
+
+  .page{
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 10vh 6vw 14vh;
+  }
+
+  .back-link{
+    display:inline-block;
+    margin-bottom: 6vh;
+    font-size: 0.78rem;
+    letter-spacing: 0.1em;
+    color: rgba(255,255,255,0.5);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(255,255,255,0.2);
+    padding-bottom: 2px;
+    transition: color 0.4s ease, border-color 0.4s ease;
+  }
+  .back-link:hover{
+    color: rgba(255,255,255,0.9);
+    border-color: rgba(255,255,255,0.6);
+  }
+
+  .title{
+    font-size: 1.4rem;
+    letter-spacing: 0.18em;
+    color: rgba(255,255,255,0.95);
+    margin-bottom: 0.6em;
+  }
+  .title .en{
+    font-family: 'Cormorant Garamond', serif;
+    font-style: italic;
+    opacity: 0.7;
+    margin-left: 0.5em;
+    font-size: 0.85em;
+  }
+
+  .subtitle{
+    font-size: 0.9rem;
+    letter-spacing: 0.12em;
+    color: rgba(255,255,255,0.5);
+    margin-bottom: 8vh;
+  }
+
+  section{
+    margin-bottom: 7vh;
+  }
+
+  h2{
+    font-size: 0.95rem;
+    font-weight: 400;
+    letter-spacing: 0.14em;
+    color: rgba(255,255,255,0.88);
+    margin-bottom: 1.4em;
+    display:flex;
+    align-items:center;
+    gap:12px;
+  }
+  h2::before{
+    content:'';
+    display:inline-block;
+    width: 18px;
+    height: 1px;
+    background: rgba(255,255,255,0.4);
+  }
+
+  p{
+    font-size: 0.86rem;
+    letter-spacing: 0.03em;
+    color: rgba(255,255,255,0.62);
+    margin-bottom: 1.2em;
+  }
+
+  .placeholder-note{
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+    color: rgba(255,180,120,0.55);
+    border: 1px dashed rgba(255,180,120,0.3);
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin-bottom: 1.2em;
+  }
+
+  .poem-list{
+    list-style: none;
+  }
+  .poem-list li{
+    padding: 14px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+  .poem-list li:last-child{
+    border-bottom: none;
+  }
+  .poem-line{
+    font-size: 0.9rem;
+    letter-spacing: 0.08em;
+    color: rgba(255,255,255,0.8);
+    margin-bottom: 6px;
+  }
+  .poem-author{
+    font-size: 0.68rem;
+    letter-spacing: 0.16em;
+    color: rgba(255,255,255,0.4);
+  }
+
+  .guide-list{
+    list-style: none;
+  }
+  .guide-list li{
+    display:flex;
+    gap: 14px;
+    font-size: 0.83rem;
+    color: rgba(255,255,255,0.62);
+    margin-bottom: 1.1em;
+  }
+  .guide-list .mark{
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 1px solid rgba(255,255,255,0.25);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size: 0.68rem;
+    color: rgba(255,255,255,0.55);
+  }
+
+  .footer{
+    margin-top: 10vh;
+    padding-top: 4vh;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    color: rgba(255,255,255,0.35);
+    display:flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .footer a{
+    color: rgba(255,255,255,0.5);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(255,255,255,0.2);
+  }
+  .footer a:hover{
+    color: rgba(255,255,255,0.85);
+  }
+
+  @media (max-width: 640px){
+    .page{ padding: 8vh 6vw 12vh; }
+    .title{ font-size: 1.15rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <a class="back-link" href="/">&larr; 回到高楼之巅</a>
+
+  <div class="title">高楼之巅 <span class="en">gaolou.org</span></div>
+  <div class="subtitle">登高，望远，然后释怀。</div>
+
+  <section>
+    <h2>关于这个地方</h2>
+    <div class="placeholder-note">
+      这一段是占位文字，建议换成你自己的话——比如为什么想做这个网站、
+      「高楼之巅」这个名字是怎么来的、你希望它对访问者意味着什么。
+      这里最适合放真实、私人的东西，网站首页那种极简风格反而装不下这些。
+    </div>
+    <p>
+      都市的高楼是现代生活的隐喻：向上、密集、无休止地运转。
+      而「高楼之巅」想做的，是把这份向上的势能，暂时折返成一次向内的呼吸——
+      登高不是为了俯瞰谁，只是为了看得更远一点，然后，把一些东西放下。
+    </p>
+  </section>
+
+  <section>
+    <h2>诗句的出处</h2>
+    <p>「云上发呆」结束时随机浮现的诗句，全部选自公有领域的古典诗词，扣的是「登高 / 望远 / 释怀」这个主题：</p>
+    <ul class="poem-list">
+      <li>
+        <div class="poem-line">欲穷千里目，更上一层楼。</div>
+        <div class="poem-author">王之涣 · 登鹳雀楼</div>
+      </li>
+      <li>
+        <div class="poem-line">行到水穷处，坐看云起时。</div>
+        <div class="poem-author">王维 · 终南别业</div>
+      </li>
+      <li>
+        <div class="poem-line">起舞弄清影，何似在人间。</div>
+        <div class="poem-author">苏轼 · 水调歌头</div>
+      </li>
+      <li>
+        <div class="poem-line">相看两不厌，只有敬亭山。</div>
+        <div class="poem-author">李白 · 独坐敬亭山</div>
+      </li>
+      <li>
+        <div class="poem-line">不畏浮云遮望眼，只缘身在最高层。</div>
+        <div class="poem-author">王安石 · 登飞来峰</div>
+      </li>
+      <li>
+        <div class="poem-line">会当凌绝顶，一览众山小。</div>
+        <div class="poem-author">杜甫 · 望岳</div>
+      </li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>怎么用</h2>
+    <ul class="guide-list">
+      <li><span class="mark">1</span><span>下方控制条选一处风景；同一个按钮再点一次，会换成这个分类的下一条画面。</span></li>
+      <li><span class="mark">2</span><span>鼠标静止 3 秒后，界面会自动隐去，只留下画面本身；移动鼠标或触屏即可唤回。</span></li>
+      <li><span class="mark">3</span><span>「云上发呆」是一段跟随呼吸节奏的引导——气泡放大对应吸气，缩小对应呼气，速度可以手动调节。</span></li>
+      <li><span class="mark">4</span><span>倒计时走完时，会有一句诗；按 Esc 或双击屏幕可以随时提前退出。</span></li>
+    </ul>
+  </section>
+
+  <div class="footer">
+    <span>高楼之巅 · gaolou.org</span>
+    <a href="/">回到首页</a>
+  </div>
+
+</div>
+
+</body>
+</html>
