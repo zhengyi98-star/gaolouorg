@@ -778,28 +778,91 @@
 
   /* ============ 沉思阅读模式 ============ */
 
-  .contemplation-passage{
+  .contemplation-intro{
     position:fixed;
     top:50%;
     left:50%;
     transform:translate(-50%, -50%);
     z-index:21;
-    font-weight:300;
-    font-size:1.05rem;
-    letter-spacing:0.08em;
-    line-height:2.3;
-    color:rgba(255,255,255,0.85);
-    text-align:center;
-    max-width:58vw;
-    white-space:pre-line;
-    text-shadow: 0 1px 14px rgba(0,0,0,0.35);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:30px;
+    max-width:60vw;
     opacity:0;
     pointer-events:none;
     transition: opacity 1.3s ease;
   }
-  .contemplation-passage.show{
+  .contemplation-intro.show{
+    opacity:1;
+    pointer-events:auto; /* 这个阶段需要能点“我准备好了” */
+  }
+
+  .contemplation-theme{
+    font-weight:300;
+    font-size:1.4rem;
+    letter-spacing:0.32em;
+    color:rgba(255,255,255,0.92);
+    text-shadow: 0 1px 16px rgba(0,0,0,0.4);
+  }
+
+  .contemplation-passage{
+    font-weight:300;
+    font-size:1rem;
+    letter-spacing:0.08em;
+    line-height:2.3;
+    color:rgba(255,255,255,0.8);
+    text-align:center;
+    white-space:pre-line;
+    text-shadow: 0 1px 14px rgba(0,0,0,0.35);
+  }
+
+  .contemplation-begin{
+    appearance:none;
+    -webkit-appearance:none;
+    border:1px solid rgba(255,255,255,0.4);
+    background:rgba(255,255,255,0.08);
+    color:rgba(255,255,255,0.92);
+    font-family:inherit;
+    font-weight:300;
+    font-size:0.8rem;
+    letter-spacing:0.16em;
+    padding:10px 30px;
+    border-radius:999px;
+    cursor:pointer;
+    transition: background 0.4s ease, border-color 0.4s ease;
+  }
+  .contemplation-begin:hover{
+    background:rgba(255,255,255,0.16);
+    border-color:rgba(255,255,255,0.75);
+  }
+
+  /* 望远模式结尾的收束语：不是诗句，是针对这次主题的具体建议 */
+  .contemplation-closing{
+    opacity:0;
+    pointer-events:none;
+    transition: opacity 1.6s var(--ease-slow);
+    text-align:center;
+    max-width:66vw;
+    font-weight:300;
+    font-size:0.92rem;
+    letter-spacing:0.05em;
+    line-height:1.9;
+    color:rgba(255,255,255,0.75);
+    text-shadow: 0 1px 12px rgba(0,0,0,0.35);
+  }
+
+  /* 呼吸（释怀）模式结尾用诗句，望远模式结尾用收束语——两者互斥显示 */
+  .meditation-layer.finale .breath-poem{
     opacity:1;
   }
+  .meditation-layer.mode-contemplate.finale .breath-poem{
+    opacity:0;
+  }
+  .meditation-layer.mode-contemplate.finale .contemplation-closing{
+    opacity:1;
+  }
+
 
   /* 安静专注期的光点：比呼吸气泡慢得多、也简单得多，没有文字、没有明显的“动作感”，
      只是缓缓地亮一点、暗一点，代表“什么都不用做，只是在这里” */
@@ -840,7 +903,9 @@
     .time-picker{ bottom:calc(5vh + 66px); min-width:210px; }
     .support-panel{ bottom:calc(5vh + 66px); min-width:210px; }
     .more-cities-panel{ bottom:calc(5vh + 66px); min-width:210px; }
-    .contemplation-passage{ max-width:82vw; font-size:0.95rem; }
+    .contemplation-intro{ max-width:84vw; }
+    .contemplation-passage{ font-size:0.92rem; }
+    .contemplation-theme{ font-size:1.2rem; }
   }
 
   /* 无障碍：尊重系统的“减少动态效果”偏好 */
@@ -976,8 +1041,8 @@
   <div class="time-picker" id="timePicker">
     <div class="time-picker__label">选一种方式</div>
     <div class="time-picker__modes">
-      <button class="time-picker__mode active" id="modeBreath" data-mode="breath">呼吸引导</button>
-      <button class="time-picker__mode" id="modeContemplate" data-mode="contemplate">沉思阅读</button>
+      <button class="time-picker__mode active" id="modeBreath" data-mode="breath">释怀</button>
+      <button class="time-picker__mode" id="modeContemplate" data-mode="contemplate">望远</button>
     </div>
     <div class="time-picker__options">
       <button class="time-picker__option" data-min="1">1 分钟</button>
@@ -994,9 +1059,15 @@
   <!-- 正念阅读环节：姿势提示隐去之后、呼吸引导开始之前，静静读一句、专注片刻 -->
   <div class="mindfulness-prompt" id="mindfulnessPrompt"></div>
 
-  <!-- ============ 沉思阅读模式专属 ============ -->
-  <!-- 完整的一段原创沉思短文，在呼吸/沉思都还没开始时先浮现出来读 -->
-  <div class="contemplation-passage" id="contemplationPassage"></div>
+  <!-- ============ 望远模式专属 ============ -->
+  <!-- 模仿 Apple Watch Reflect 的结构：先给一个主题词，再是完整短文，
+       读完之后用户自己点“我准备好了”才真正进入安静专注期——
+       跟“释怀”呼吸模式的全自动播放刻意做出不同的节奏，不是简单换皮 -->
+  <div class="contemplation-intro" id="contemplationIntro">
+    <div class="contemplation-theme" id="contemplationTheme"></div>
+    <div class="contemplation-passage" id="contemplationPassage"></div>
+    <button class="contemplation-begin" id="contemplationBegin">我准备好了</button>
+  </div>
 
   <!-- ============ 中央呼吸冥想层 ============ -->
   <div class="meditation-layer" id="meditationLayer" aria-hidden="true">
@@ -1021,6 +1092,10 @@
       <div class="breath-poem__line" id="poemLine"></div>
       <div class="breath-poem__author" id="poemAuthor"></div>
     </div>
+
+    <!-- 望远模式的收尾：不是诗句，是针对刚才那个主题给的一句具体建议，
+         呼应 Reflect “如何把这次反思用到日常生活里”的做法 -->
+    <div class="contemplation-closing" id="contemplationClosing"></div>
 
     <div class="breath-hint">按 Esc 或双击屏幕，随时回到高楼之巅</div>
   </div>
@@ -1487,8 +1562,12 @@
   var rateSlowerBtn    = document.getElementById('rateSlower');
   var rateFasterBtn    = document.getElementById('rateFaster');
   var rateValueLabel   = document.getElementById('rateValue');
+  var contemplationIntro   = document.getElementById('contemplationIntro');
+  var contemplationTheme   = document.getElementById('contemplationTheme');
   var contemplationPassage = document.getElementById('contemplationPassage');
+  var contemplationBegin   = document.getElementById('contemplationBegin');
   var contemplationGlow    = document.getElementById('contemplationGlow');
+  var contemplationClosing = document.getElementById('contemplationClosing');
 
   var countdownTimer  = null;
   var breathPhaseTimer = null;
@@ -1523,13 +1602,40 @@
 
   // 沉思阅读的短文池：每段都是原创，不是引用，风格延续“登高，望远，然后释怀”，
   // 刻意保持世俗、不涉及任何具体宗教传统
+  // 望远模式的内容池：仿照 Reflect 的结构——一个主题词、一段完整短文、
+  // 一句针对这个主题的具体建议（不是空泛的诗意收尾，是能带回日常生活里用的）。
+  // 全部原创，不是引用
   var PASSAGES = [
-    '你不需要立刻变得更好。\n允许自己，只是停在这里。\n呼吸会自己完成它的工作，\n你只需要，不去打扰它。',
-    '有些念头，不必收留它们过夜。\n让它们经过，像云经过山头，\n不留痕迹，也没关系。',
-    '此刻你所在的地方，\n就是唯一需要抵达的地方。\n不必去想接下来做什么，\n接下来，会自己到来。',
-    '高处的风，吹不散所有烦恼，\n却能让你看清，它们有多小。\n你不是被困住了，\n你只是，还没往上走一层。',
-    '安静不是没有声音，\n是你不再急着回应什么。\n给自己一点时间，\n什么都不做，也是一种完成。',
-    '你带着一整天的重量走到这里。\n现在，可以把它们，\n暂时放在门口。'
+    {
+      theme:'接纳',
+      passage:'你不需要立刻变得更好。\n允许自己，只是停在这里。\n呼吸会自己完成它的工作，\n你只需要，不去打扰它。',
+      closing:'今天，允许自己有一件事，做得不够好。'
+    },
+    {
+      theme:'放下',
+      passage:'有些念头，不必收留它们过夜。\n让它们经过，像云经过山头，\n不留痕迹，也没关系。',
+      closing:'回到日常后，试着对一件小事说：这次，我不接了。'
+    },
+    {
+      theme:'临在',
+      passage:'此刻你所在的地方，\n就是唯一需要抵达的地方。\n不必去想接下来做什么，\n接下来，会自己到来。',
+      closing:'下一次走神时，只需轻轻问自己：我现在，在哪里？'
+    },
+    {
+      theme:'渺小',
+      passage:'高处的风，吹不散所有烦恼，\n却能让你看清，它们有多小。\n你不是被困住了，\n你只是，还没往上走一层。',
+      closing:'把那件让你烦心的事，想象成脚下的一栋楼，而不是整座城市。'
+    },
+    {
+      theme:'安静',
+      passage:'安静不是没有声音，\n是你不再急着回应什么。\n给自己一点时间，\n什么都不做，也是一种完成。',
+      closing:'接下来一小时，试着晚一点回复，而不是立刻。'
+    },
+    {
+      theme:'卸下',
+      passage:'你带着一整天的重量走到这里。\n现在，可以把它们，\n暂时放在门口。',
+      closing:'离开这里之后，那些重量，你可以选择只拿回一部分。'
+    }
   ];
   var lastPassageIndex = null;
 
@@ -1614,7 +1720,8 @@
     meditationLayer.classList.remove('mode-contemplate');
     meditationCue.classList.remove('show');
     mindfulnessPrompt.classList.remove('show');
-    contemplationPassage.classList.remove('show');
+    contemplationIntro.classList.remove('show');
+    currentPassageEntry = null;
     resetBubbleFlourish();
     resetGlowFlourish();
 
@@ -1660,14 +1767,18 @@
     }
 
     finaleTimer = setTimeout(function(){
-      var poem = pickPoem();
-      poemLine.textContent = poem.line;
-      poemAuthor.textContent = poem.author;
+      if (currentPracticeMode === 'contemplate' && currentPassageEntry){
+        contemplationClosing.textContent = currentPassageEntry.closing;
+      } else {
+        var poem = pickPoem();
+        poemLine.textContent = poem.line;
+        poemAuthor.textContent = poem.author;
+      }
       meditationLayer.classList.add('finale');
 
       finaleTimer = setTimeout(function(){
         exitMeditation();
-      }, 8000); // 诗句停留 8 秒
+      }, 8000); // 停留 8 秒
     }, 1300);
   }
 
@@ -1736,9 +1847,13 @@
   // 沉思阅读模式：跟呼吸引导共用同一套开场仪式骨架（姿势提示 → 正文 → 正式开始），
   // 只是中间读的内容更长（完整一段短文，不是一句话），呼吸气泡换成安静的光点，
   // 也没有呼吸节奏可调——沉思本身没有“节奏”这回事
+  var currentPassageEntry = null; // 记住这次选中的是哪一段，结尾要用它的 closing 收束语
+  var contemplationMinutesPending = 0;
+
   function startContemplation(minutes){
     currentPracticeMode = 'contemplate';
     meditationLayer.classList.add('mode-contemplate');
+    contemplationMinutesPending = minutes;
 
     closeSupportPanel();
     closeMoreCities();
@@ -1749,12 +1864,7 @@
     var CUE_APPEAR_AT   = 650;
     var CUE_HOLD_MS     = 1800;
     var CUE_FADE_OUT_MS = 900;
-
-    var PASSAGE_APPEAR_AT   = CUE_APPEAR_AT + CUE_HOLD_MS + CUE_FADE_OUT_MS;
-    var PASSAGE_HOLD_MS     = 9000; // 完整一段短文，读完加上停留、体会一下，需要更长的时间
-    var PASSAGE_FADE_OUT_MS = 1100;
-
-    var GLOW_APPEAR_AT = PASSAGE_APPEAR_AT + PASSAGE_HOLD_MS + PASSAGE_FADE_OUT_MS;
+    var INTRO_APPEAR_AT = CUE_APPEAR_AT + CUE_HOLD_MS + CUE_FADE_OUT_MS;
 
     ritualTimers.push(setTimeout(function(){
       meditationCue.classList.add('show');
@@ -1764,21 +1874,29 @@
       meditationCue.classList.remove('show');
     }, CUE_APPEAR_AT + CUE_HOLD_MS));
 
+    // 主题词 + 短文一起浮现，之后不再自动往下走——
+    // 跟“释怀”呼吸模式全自动播放不同，这里刻意让用户自己读完、自己点“我准备好了”
+    // 才真正进入安静专注期，节奏交给用户自己掌握
     ritualTimers.push(setTimeout(function(){
-      contemplationPassage.textContent = pickPassage();
-      contemplationPassage.classList.add('show');
-    }, PASSAGE_APPEAR_AT));
+      currentPassageEntry = pickPassage();
+      contemplationTheme.textContent = currentPassageEntry.theme;
+      contemplationPassage.textContent = currentPassageEntry.passage;
+      contemplationIntro.classList.add('show');
+    }, INTRO_APPEAR_AT));
+  }
 
-    ritualTimers.push(setTimeout(function(){
-      contemplationPassage.classList.remove('show');
-    }, PASSAGE_APPEAR_AT + PASSAGE_HOLD_MS));
+  // “我准备好了”：主题+短文淡出，稍作停顿后光点浮现，倒计时这时候才真正开始走——
+  // 选的 1/3/5 分钟完整用在安静专注本身，不会被前面的阅读环节吃掉
+  contemplationBegin.addEventListener('click', function(e){
+    e.stopPropagation();
+    if (!document.body.classList.contains('meditating') || currentPracticeMode !== 'contemplate') return;
 
-    // 短文完全隐去之后，安静的光点才浮现，倒计时这时候才真正开始走，
-    // 道理跟呼吸模式一样：选的时长要完整用在“安静专注”本身
-    ritualTimers.push(setTimeout(function(){
+    contemplationIntro.classList.remove('show');
+
+    var glowTimer = setTimeout(function(){
       meditationLayer.classList.add('active');
 
-      remainingSeconds = minutes * 60;
+      remainingSeconds = contemplationMinutesPending * 60;
       updateCountdownDisplay();
       countdownTimer = setInterval(function(){
         remainingSeconds--;
@@ -1787,8 +1905,9 @@
           naturalEnd();
         }
       }, 1000);
-    }, GLOW_APPEAR_AT));
-  }
+    }, 900);
+    ritualTimers.push(glowTimer);
+  });
 
   // 按吸气/呼气各自的时长递归排程，文字切换的时刻精确对应气泡放大到顶/缩回底的时刻，
   // 而不是像固定 setInterval 那样跟动画各走各的
