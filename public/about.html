@@ -136,6 +136,16 @@
     color: rgba(255,255,255,0.55);
   }
 
+  .song-embed{
+    border-radius: 12px;
+    overflow: hidden;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+  .song-embed iframe{
+    display: block;
+  }
+
   .footer{
     margin-top: 10vh;
     padding-top: 4vh;
@@ -229,6 +239,14 @@
       <li><span class="mark">3</span><span>「云上发呆」是一段跟随呼吸节奏的引导——气泡放大对应吸气，缩小对应呼气，速度可以手动调节。</span></li>
       <li><span class="mark">4</span><span>倒计时走完时，会有一句诗；按 Esc 或双击屏幕可以随时提前退出。</span></li>
     </ul>
+  </section>
+
+  <section>
+    <h2>一首歌</h2>
+    <p>如果只能配一首歌，大概是这首——同样是「登高」的意境。</p>
+    <div class="song-embed">
+      <iframe data-testid="embed-iframe" style="border-radius:12px" src="https://open.spotify.com/embed/track/5ylU2GruSTLu4R9iJMIYmb?utm_source=generator&si=1fb1c2b2e9aa4e2d" width="100%" height="152" frameBorder="0" allowfullscreen="" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>
+    </div>
   </section>
 
   <div class="footer">
